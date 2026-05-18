@@ -1,99 +1,86 @@
 <!-- ================= HEADER ================= -->
-<h1 align="center">Hi 👋, I'm Sanka Adikaram</h1>
-<h3 align="center">AI | Machine Learning | Full Stack Developer | Electronics Enthusiast</h3>
+<h1 align="center">🛍️ DX Fashion POS System</h1>
+<h3 align="center">A Comprehensive Web-Based Point of Sale & Inventory Management System</h3>
 
 ---
 
-## 🧑💻 About Me
+## 📝 About The Project
 
-- 🇱🇰 Based in Sri Lanka  
-- 💡 Passionate about Artificial Intelligence and Machine Learning  
-- 🛠️ Skilled in both software development and hands-on technical systems  
-- 🚀 Focused on building real-world AI-powered solutions  
-- 📈 Continuously learning and improving in modern technologies  
+**DX Fashion POS System** is a robust, full-stack Point of Sale application specifically designed for clothing retail shops. Built to handle everyday business operations smoothly, it features real-time inventory tracking, seamless checkout processes, automated printable receipt generation, and detailed sales reporting. 
+
+The system implements Role-Based Access Control (RBAC) to ensure secure operations, distinguishing between Admin privileges (full control) and Cashier privileges (sales and customer operations only).
 
 ---
 
-## 🚀 Key Projects
+## 🚀 Key Features
 
-- 🏏 **Cricket Match Prediction System** – Machine learning-based predictive analytics  
-- 🪖 **Smart Gate Monitoring System** – Real-time monitoring and alerting solution  
-- ☀️ **AI-Based Solar Flare Prediction System** – Forecasting using data-driven models  
-- 🔫 **T-56 Virtual Smart Firearm Simulator** – Computer vision-based training system  
-- 🛍️ **DX Fashion POS System** – Full-stack Point of Sale system with inventory management
-
----
-
-## 🛠️ Technical Skills
-
-- **Programming:** Python, JavaScript, C++  
-- **Backend Development:** FastAPI, Node.js, PHP
-- **Web Technologies:** HTML5, CSS3, Bootstrap
-- **Databases:** MySQL, PostgreSQL  
-- **Tools & Platforms:** Git, Linux, VS Code  
-- **Hardware & Systems:** Electronics & Embedded systems, CCTV Installation, Laptop Repair & Maintenance  
+- 🔐 **Role-Based Authentication** – Secure login with password hashing for Admins and Cashiers.
+- 📊 **Dynamic Dashboard** – Real-time tracking of today's sales, monthly revenue, and low-stock alerts.
+- 🛒 **Smart POS Terminal** – AJAX-powered product search, real-time cart calculation (tax & discount), and barcode scanning support.
+- 📦 **Inventory Management** – Complete CRUD operations for products, categories, and brands.
+- 📋 **Stock Tracking** – Automated stock deductions during sales and manual "Stock In/Out" logging.
+- 👥 **User Management** – Dedicated panels for managing Customers, Suppliers, and System Users.
+- 🧾 **Printable Receipts** – Auto-generated, printer-friendly thermal receipts for every transaction.
+- 📈 **Detailed Reports** – Daily and monthly sales analytics to track business performance.
 
 ---
 
 ## 🧰 Tech Stack
 
 ### 💻 Core Technologies
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
-![C++](https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-777BB4?style=for-the-badge&logo=php&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 
----
-
-### 🌐 Web & Backend
+### 🌐 Frontend & Styling
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
 ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Bootstrap](https://img.shields.io/badge/Bootstrap-563D7C?style=for-the-badge&logo=bootstrap&logoColor=white)
+![jQuery](https://img.shields.io/badge/jQuery-0769AD?style=for-the-badge&logo=jquery&logoColor=white)
 
 ---
 
-### ⚙️ Frameworks & Tools
-![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
-![Arduino](https://img.shields.io/badge/Arduino-00979D?style=for-the-badge&logo=arduino&logoColor=white)
-![ASP.NET](https://img.shields.io/badge/ASP.NET-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
-![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
-![VS Code](https://img.shields.io/badge/VSCode-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white)
+## 🗄️ Database Architecture
+
+The system operates on a highly normalized relational database named `fashion_pos` comprising **13 structured tables**:
+- `users`, `employees`, `attendance`
+- `products`, `categories`, `brands`
+- `customers`, `suppliers`
+- `sales`, `sale_items`
+- `purchases`, `purchase_items`
+- `inventory_logs`
 
 ---
 
-### 🗄️ Databases
-![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+## ⚙️ Installation & Setup
+
+Follow these steps to run the project locally on your machine:
+
+1. **Install XAMPP/WAMP**
+   - Download and install [XAMPP](https://www.apachefriends.org/index.html).
+   - Start the **Apache** and **MySQL** modules from the XAMPP Control Panel.
+
+2. **Clone the Repository**
+   - Clone this project into your `htdocs` directory (e.g., `C:\xampp\htdocs\POS system`).
+
+3. **Database Setup**
+   - Open phpMyAdmin (`http://localhost/phpmyadmin`).
+   - Create a new database named **`fashion_pos`**.
+   - Import the provided SQL schema file located at `sql/fashion_pos.sql`.
+
+4. **Access the System**
+   - Open your web browser and go to: `http://localhost/POS%20system/login.php`
+
+### 🔑 Default Login Credentials
+
+**Admin Account**
+- **Username:** `admin`
+- **Password:** `password123`
+
+**Cashier Account**
+- **Username:** `cashier`
+- **Password:** `password123`
 
 ---
 
-### ☁️ DevOps & Cloud
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
-![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazonaws&logoColor=white)
-![Azure](https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)
-
----
-## 📊 GitHub Analytics
-
-<p align="center">
-  <img src="https://github-readme-stats.vercel.app/api?username=sankaadikaramNW&show_icons=true&theme=tokyonight" height="180">
-  <img src="https://github-readme-streak-stats.herokuapp.com/?user=sankaadikaramNW&theme=tokyonight" height="180">
-</p>
-
-<p align="center">
-  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=sankaadikaramNW&layout=compact&theme=tokyonight">
-</p>
-
-### 📫 Contact Me
-
-[![Portfolio](https://img.shields.io/badge/Portfolio-000?style=for-the-badge&logo=vercel&logoColor=white)](https://sankaadikaramnw.github.io/portfolio/)
-[![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:sankaadikaramnew@gmail.com)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/sanka-adikaram-9683b3192)
-
----
-
-⭐️ *Building intelligent systems that bridge software and real-world applications*
+⭐️ *If you found this project helpful, please consider giving it a star!*
