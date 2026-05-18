@@ -55,6 +55,7 @@ $products = $pdo->query("SELECT * FROM products ORDER BY id DESC")->fetchAll();
             </div>
             <nav>
                 <a href="admin_dashboard.php" class="nav-link active">Inventory Management</a>
+                <a href="seller_dashboard.php" class="nav-link">New Sale</a>
                 <a href="reports.php" class="nav-link">Sales Reports</a>
                 <a href="auth.php?logout=1" class="nav-link" style="margin-top: auto; color: #f87171;">Logout</a>
             </nav>

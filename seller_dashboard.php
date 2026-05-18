@@ -23,9 +23,9 @@ if (isset($_POST['complete_sale'])) {
             $pdo->beginTransaction();
 
             // Insert Sale
-            $stmt = $pdo->prepare("INSERT INTO sales (seller_id, total_amount, discount_amount, final_amount) VALUES (?, ?, ?, ?) RETURNING id");
+            $stmt = $pdo->prepare("INSERT INTO sales (seller_id, total_amount, discount_amount, final_amount) VALUES (?, ?, ?, ?)");
             $stmt->execute([$seller_id, $total_amount, $discount, $final_amount]);
-            $sale_id = $stmt->fetchColumn();
+            $sale_id = $pdo->lastInsertId();
 
             // Insert Items and Update Stock
             foreach ($cart_data as $item) {
@@ -85,6 +85,7 @@ if (isset($_POST['complete_sale'])) {
             </div>
             <nav>
                 <a href="seller_dashboard.php" class="nav-link active">New Sale</a>
+                <a href="reports.php" class="nav-link">Sales Reports</a>
                 <a href="auth.php?logout=1" class="nav-link" style="margin-top: auto; color: #f87171;">Logout</a>
             </nav>
         </div>

@@ -1,40 +1,43 @@
 <?php
 session_start();
-require_once 'includes/db_config.php';
+require_once 'config/database.php';
 
 if (isset($_POST['login'])) {
-    $username = $_POST['username'];
+    $username = trim($_POST['username']);
     $password = $_POST['password'];
 
+    if (empty($username) || empty($password)) {
+        $_SESSION['error'] = "Please fill in all fields.";
+        header("Location: login.php");
+        exit();
+    }
+
     try {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
+        $stmt = $pdo->prepare("SELECT id, full_name, username, password, role FROM users WHERE username = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password'])) {
+            // Success
             $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
             $_SESSION['full_name'] = $user['full_name'];
-
-            if ($user['role'] == 'admin') {
-                header("Location: admin_dashboard.php");
-            } else {
-                header("Location: seller_dashboard.php");
-            }
+            $_SESSION['role'] = $user['role'];
+            
+            header("Location: dashboard.php");
             exit();
         } else {
-            header("Location: index.php?error=1");
+            // Failed
+            $_SESSION['error'] = "Invalid username or password.";
+            header("Location: login.php");
             exit();
         }
     } catch (PDOException $e) {
-        die("Login error: " . $e->getMessage());
+        $_SESSION['error'] = "Database error: " . $e->getMessage();
+        header("Location: login.php");
+        exit();
     }
-}
-
-if (isset($_GET['logout'])) {
-    session_destroy();
-    header("Location: index.php");
+} else {
+    header("Location: login.php");
     exit();
 }
 ?>
