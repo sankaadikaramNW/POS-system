@@ -99,7 +99,7 @@ $brands = $pdo->query("SELECT * FROM brands ORDER BY brand_name")->fetchAll();
                         </td>
                         <td><?= htmlspecialchars($p['category_name'] ?? 'N/A') ?></td>
                         <td><?= htmlspecialchars($p['brand_name'] ?? 'N/A') ?></td>
-                        <td>$<?= number_format($p['selling_price'], 2) ?></td>
+                        <td>LKR <?= number_format($p['selling_price'], 2) ?></td>
                         <td>
                             <?php if($p['stock_quantity'] <= $p['reorder_level']): ?>
                                 <span class="badge bg-danger"><?= $p['stock_quantity'] ?></span>

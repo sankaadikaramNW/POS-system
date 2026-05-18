@@ -90,8 +90,8 @@ $subtotal = 0;
             <tr>
                 <td><?= htmlspecialchars($item['product_name']) ?></td>
                 <td><?= $item['quantity'] ?></td>
-                <td>$<?= number_format($item['selling_price'], 2) ?></td>
-                <td class="text-right">$<?= number_format($item['subtotal'], 2) ?></td>
+                <td>LKR <?= number_format($item['selling_price'], 2) ?></td>
+                <td class="text-right">LKR <?= number_format($item['subtotal'], 2) ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
@@ -100,27 +100,27 @@ $subtotal = 0;
     <table style="border: none;">
         <tr>
             <td style="border:none">Subtotal:</td>
-            <td style="border:none" class="text-right">$<?= number_format($subtotal, 2) ?></td>
+            <td style="border:none" class="text-right">LKR <?= number_format($subtotal, 2) ?></td>
         </tr>
         <tr>
             <td style="border:none">Discount:</td>
-            <td style="border:none" class="text-right">-$<?= number_format($sale['discount'], 2) ?></td>
+            <td style="border:none" class="text-right">-LKR <?= number_format($sale['discount'], 2) ?></td>
         </tr>
         <tr>
             <td style="border:none">Tax:</td>
-            <td style="border:none" class="text-right">+$<?= number_format($sale['tax'], 2) ?></td>
+            <td style="border:none" class="text-right">+LKR <?= number_format($sale['tax'], 2) ?></td>
         </tr>
         <tr>
             <td style="border:none" class="font-bold h3">Grand Total:</td>
-            <td style="border:none" class="text-right font-bold h3">$<?= number_format($sale['total_amount'], 2) ?></td>
+            <td style="border:none" class="text-right font-bold h3">LKR <?= number_format($sale['total_amount'], 2) ?></td>
         </tr>
         <tr>
             <td style="border:none">Paid (<?= $sale['payment_method'] ?>):</td>
-            <td style="border:none" class="text-right">$<?= number_format($sale['paid_amount'], 2) ?></td>
+            <td style="border:none" class="text-right">LKR <?= number_format($sale['paid_amount'], 2) ?></td>
         </tr>
         <tr>
             <td style="border:none">Change:</td>
-            <td style="border:none" class="text-right">$<?= number_format(abs($sale['balance']), 2) ?></td>
+            <td style="border:none" class="text-right">LKR <?= number_format(abs($sale['balance']), 2) ?></td>
         </tr>
     </table>
     

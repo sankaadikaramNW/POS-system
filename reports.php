@@ -49,7 +49,7 @@ $top_products = $stmt->fetchAll();
                         <tr>
                             <td><?= $ds['date'] ?></td>
                             <td><?= $ds['total_invoices'] ?></td>
-                            <td>$<?= number_format($ds['total_sales'], 2) ?></td>
+                            <td>LKR <?= number_format($ds['total_sales'], 2) ?></td>
                         </tr>
                         <?php endforeach; ?>
                         <?php if(empty($daily_sales)): ?>

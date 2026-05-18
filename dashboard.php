@@ -54,10 +54,10 @@ $low_stock = $stmt->fetchAll();
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h6 class="text-uppercase mb-2">Today's Sales</h6>
-                        <h3 class="mb-0">$<?= number_format($today_sales, 2) ?></h3>
+                        <h3 class="mb-0">LKR <?= number_format($today_sales, 2) ?></h3>
                     </div>
                     <div class="fs-1 opacity-50">
-                        <i class="fas fa-dollar-sign"></i>
+                        <span class="fw-bold fs-3">LKR</span>
                     </div>
                 </div>
             </div>
@@ -70,7 +70,7 @@ $low_stock = $stmt->fetchAll();
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h6 class="text-uppercase mb-2">Monthly Sales</h6>
-                        <h3 class="mb-0">$<?= number_format($monthly_sales, 2) ?></h3>
+                        <h3 class="mb-0">LKR <?= number_format($monthly_sales, 2) ?></h3>
                     </div>
                     <div class="fs-1 opacity-50">
                         <i class="fas fa-chart-line"></i>
@@ -137,7 +137,7 @@ $low_stock = $stmt->fetchAll();
                             <tr>
                                 <td><?= htmlspecialchars($rs['invoice_no']) ?></td>
                                 <td><?= htmlspecialchars($rs['customer_name'] ?? 'Walk-in') ?></td>
-                                <td>$<?= number_format($rs['total_amount'], 2) ?></td>
+                                <td>LKR <?= number_format($rs['total_amount'], 2) ?></td>
                                 <td><?= date('M d, Y H:i', strtotime($rs['sale_date'])) ?></td>
                             </tr>
                             <?php endforeach; ?>
