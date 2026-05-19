@@ -156,8 +156,11 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                 <!-- Thermal Invoice Card Structure -->
                 <div class="thermal-receipt-preview" id="receiptPreview">
                     <div class="text-center">
-                        <h2 style="margin: 0; font-weight: 800; font-size: 1.5rem; letter-spacing: 1px;">DXL FASHION</h2>
-                        <p style="margin: 5px 0;">123 Style Street, City<br>Phone: 123-456-7890</p>
+                        <div class="d-inline-block mb-1" style="width: 48px; height: 48px; border-radius: 50%; overflow: hidden; border: 1.5px solid #000; background-color: #000; vertical-align: middle;">
+                            <img src="assets/images/PSX_20260519_122008.jpg" alt="Logo" style="width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) contrast(1.3); transform: scale(1.22); transform-origin: center center;">
+                        </div>
+                        <h2 style="margin: 5px 0 0 0; font-weight: 800; font-size: 1.35rem; letter-spacing: 1px;">DXL FASHION</h2>
+                        <p style="margin: 3px 0 5px 0;">123 Style Street, City<br>Phone: 123-456-7890</p>
                         <div class="dashed-line"></div>
                         <h3 style="margin: 5px 0; font-weight: 700; font-size: 1.1rem; letter-spacing: 2px;">TAX INVOICE</h3>
                     </div>

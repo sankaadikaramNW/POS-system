@@ -34,8 +34,8 @@ header("Expires: Sat, 01 Jan 2000 00:00:00 GMT");
 
         <!-- Page Content -->
         <div id="content">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm mb-2">
-                <div class="container-fluid">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm" style="height: 90px; min-height: 90px; padding: 0 15px; display: flex; align-items: center; border: none; border-radius: 0; margin-bottom: 0 !important; box-shadow: 0 2px 10px rgba(0,0,0,0.05); flex-shrink: 0; background: #fff !important;">
+                <div class="container-fluid" style="height: 100%; display: flex; align-items: center;">
                     <button type="button" id="sidebarCollapse" class="btn btn-primary">
                         <i class="fas fa-bars"></i>
                     </button>
@@ -48,4 +48,4 @@ header("Expires: Sat, 01 Jan 2000 00:00:00 GMT");
             </nav>
             
             <!-- Main Content Container -->
-            <div class="container-fluid">
+            <div class="container-fluid" style="padding: 25px 35px !important;">

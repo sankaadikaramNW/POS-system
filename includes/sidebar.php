@@ -4,8 +4,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
 $role = $_SESSION['role'] ?? 'cashier';
 ?>
 <nav id="sidebar">
-    <div class="sidebar-header">
-        <h3><i class="fas fa-tshirt"></i> DXL Fashion</h3>
+    <div class="sidebar-header d-flex align-items-center gap-3" style="background: #1a252f; border-bottom: 1px solid rgba(0,0,0,0.15); height: 90px; overflow: hidden; padding: 0 20px;">
+        <div style="width: 68px; height: 68px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(255, 215, 0, 0.6); flex-shrink: 0; display: flex; align-items: center; justify-content: center; background-color: #0c0d12; box-shadow: 0 0 12px rgba(255, 215, 0, 0.2);">
+            <img src="assets/images/PSX_20260519_122008.jpg" alt="DXL Logo" style="width: 100%; height: 100%; object-fit: cover; transform: scale(1.22); transform-origin: center center;">
+        </div>
+        <div class="d-flex flex-column" style="line-height: 1.25;">
+            <span class="fw-bold text-white" style="font-size: 1.25rem; letter-spacing: 0.5px;">DXL Fashion</span>
+            <span class="text-muted" style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #cbd5e1 !important; opacity: 0.9;">Men's & Boys</span>
+        </div>
     </div>
 
     <ul class="list-unstyled components">

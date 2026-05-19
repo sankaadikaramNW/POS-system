@@ -62,8 +62,11 @@ $subtotal = 0;
 
 <div class="receipt-card">
     <div class="text-center">
-        <h2>DX FASHION</h2>
-        <p>123 Style Street, City<br>Phone: 123-456-7890</p>
+        <div style="display: inline-block; margin-bottom: 8px; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; border: 1.5px solid #000; background-color: #000; vertical-align: middle;">
+            <img src="assets/images/PSX_20260519_122008.jpg" alt="Logo" style="width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) contrast(1.3); transform: scale(1.22); transform-origin: center center;">
+        </div>
+        <h2 style="margin: 5px 0 0 0;">DXL FASHION</h2>
+        <p style="margin: 3px 0 5px 0;">123 Style Street, City<br>Phone: 123-456-7890</p>
         <p>--------------------------------</p>
         <p class="font-bold">RECEIPT</p>
     </div>
