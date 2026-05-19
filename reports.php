@@ -98,7 +98,7 @@ $top_products = $stmt->fetchAll();
                 <i class="fas fa-file-pdf fa-3x text-danger mb-3"></i>
                 <h4>Export Advanced Reports</h4>
                 <p class="text-muted">Generate comprehensive PDF reports for inventory, monthly profits, and detailed tax summaries.</p>
-                <button class="btn btn-danger" onclick="alert('PDF Generation functionality would be implemented using a library like TCPDF or Dompdf.')">Export to PDF</button>
+                <button class="btn btn-danger no-print" onclick="window.print()">Export to PDF</button>
             </div>
         </div>
     </div>

@@ -5,7 +5,7 @@ $role = $_SESSION['role'] ?? 'cashier';
 ?>
 <nav id="sidebar">
     <div class="sidebar-header">
-        <h3><i class="fas fa-tshirt"></i> DX Fashion</h3>
+        <h3><i class="fas fa-tshirt"></i> DXL Fashion</h3>
     </div>
 
     <ul class="list-unstyled components">
@@ -18,9 +18,11 @@ $role = $_SESSION['role'] ?? 'cashier';
         <li class="<?= $current_page == 'products.php' ? 'active' : '' ?>">
             <a href="products.php"><i class="fas fa-box"></i> Products</a>
         </li>
+        <?php if($role === 'admin'): ?>
         <li class="<?= $current_page == 'inventory.php' ? 'active' : '' ?>">
             <a href="inventory.php"><i class="fas fa-warehouse"></i> Inventory</a>
         </li>
+        <?php endif; ?>
         <li class="<?= $current_page == 'customers.php' ? 'active' : '' ?>">
             <a href="customers.php"><i class="fas fa-users"></i> Customers</a>
         </li>

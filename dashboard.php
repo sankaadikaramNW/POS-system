@@ -22,7 +22,7 @@ $total_customers = $stmt->fetch()['total_customers'];
 
 // Recent Sales
 $stmt = $pdo->query("
-    SELECT s.invoice_no, s.total_amount, s.sale_date, c.customer_name 
+    SELECT s.id, s.invoice_no, s.total_amount, s.sale_date, c.customer_name 
     FROM sales s 
     LEFT JOIN customers c ON s.customer_id = c.id 
     ORDER BY s.id DESC LIMIT 5
@@ -49,67 +49,75 @@ $low_stock = $stmt->fetchAll();
 <div class="row g-4 mb-4">
     <!-- Today's Sales -->
     <div class="col-md-3">
-        <div class="card bg-primary text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-uppercase mb-2">Today's Sales</h6>
-                        <h3 class="mb-0">LKR <?= number_format($today_sales, 2) ?></h3>
-                    </div>
-                    <div class="fs-1 opacity-50">
-                        <span class="fw-bold fs-3">LKR</span>
+        <a href="reports.php" class="text-decoration-none">
+            <div class="card bg-primary text-white h-100 dashboard-tile">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-2">Today's Sales</h6>
+                            <h3 class="mb-0">LKR <?= number_format($today_sales, 2) ?></h3>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <span class="fw-bold fs-3">LKR</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     <!-- Monthly Sales -->
     <div class="col-md-3">
-        <div class="card bg-success text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-uppercase mb-2">Monthly Sales</h6>
-                        <h3 class="mb-0">LKR <?= number_format($monthly_sales, 2) ?></h3>
-                    </div>
-                    <div class="fs-1 opacity-50">
-                        <i class="fas fa-chart-line"></i>
+        <a href="reports.php" class="text-decoration-none">
+            <div class="card bg-success text-white h-100 dashboard-tile">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-2">Monthly Sales</h6>
+                            <h3 class="mb-0">LKR <?= number_format($monthly_sales, 2) ?></h3>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     <!-- Total Products -->
     <div class="col-md-3">
-        <div class="card bg-info text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-uppercase mb-2">Total Products</h6>
-                        <h3 class="mb-0"><?= number_format($total_products) ?></h3>
-                    </div>
-                    <div class="fs-1 opacity-50">
-                        <i class="fas fa-box-open"></i>
+        <a href="products.php" class="text-decoration-none">
+            <div class="card bg-info text-white h-100 dashboard-tile">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-2">Total Products</h6>
+                            <h3 class="mb-0"><?= number_format($total_products) ?></h3>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <i class="fas fa-box-open"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     <!-- Total Customers -->
     <div class="col-md-3">
-        <div class="card bg-warning text-dark h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-uppercase mb-2">Total Customers</h6>
-                        <h3 class="mb-0"><?= number_format($total_customers) ?></h3>
-                    </div>
-                    <div class="fs-1 opacity-50">
-                        <i class="fas fa-users"></i>
+        <a href="customers.php" class="text-decoration-none">
+            <div class="card bg-warning text-dark h-100 dashboard-tile">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-2">Total Customers</h6>
+                            <h3 class="mb-0"><?= number_format($total_customers) ?></h3>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <i class="fas fa-users"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
 </div>
 
@@ -119,7 +127,7 @@ $low_stock = $stmt->fetchAll();
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Recent Sales</h5>
-                <a href="sales.php" class="btn btn-sm btn-primary">View All</a>
+                <a href="reports.php" class="btn btn-sm btn-primary">View All</a>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -134,8 +142,8 @@ $low_stock = $stmt->fetchAll();
                         </thead>
                         <tbody>
                             <?php foreach($recent_sales as $rs): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($rs['invoice_no']) ?></td>
+                            <tr class="sale-row" style="cursor: pointer;" onclick="viewSaleDetail('<?= htmlspecialchars($rs['invoice_no']) ?>')">
+                                <td><i class="fas fa-file-invoice text-primary me-1"></i> <?= htmlspecialchars($rs['invoice_no']) ?></td>
                                 <td><?= htmlspecialchars($rs['customer_name'] ?? 'Walk-in') ?></td>
                                 <td>LKR <?= number_format($rs['total_amount'], 2) ?></td>
                                 <td><?= date('M d, Y H:i', strtotime($rs['sale_date'])) ?></td>
@@ -172,5 +180,234 @@ $low_stock = $stmt->fetchAll();
         </div>
     </div>
 </div>
+
+<!-- Transaction Detail Modal -->
+<div class="modal fade" id="saleDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> Transaction Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3" style="max-height: 70vh; overflow-y: auto;">
+                <div id="saleDetailContent" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 d-flex gap-2">
+                <button type="button" class="btn btn-primary flex-grow-1" onclick="printSaleDetail()"><i class="fas fa-print me-2"></i> Print</button>
+                <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal"><i class="fas fa-times me-2"></i> Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Admin PIN Modal -->
+<div class="modal fade" id="adminPinModal" tabindex="-1" style="z-index: 1060;">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 12px; overflow: hidden; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+            <div class="modal-header bg-danger text-white border-0">
+                <h6 class="modal-title fw-bold"><i class="fas fa-lock me-2"></i> Admin PIN Required</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <p class="text-muted small mb-3">This bill has already been printed. Please enter the Admin PIN to authorize reprinting.</p>
+                <input type="password" id="adminPinInput" class="form-control text-center fw-bold fs-4 mb-3" maxlength="4" placeholder="••••" style="letter-spacing: 10px; border-radius: 8px;">
+                <button type="button" class="btn btn-danger w-100 py-2 fw-bold" onclick="verifyAdminPinAndPrint()" style="border-radius: 8px;">Authorize & Print</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Print container for transaction detail -->
+<div id="printDetailContainer" class="print-only"></div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script>
+let currentSaleId = null;
+let currentPrintCount = 0;
+let currentInvoiceNo = '';
+const userRole = '<?= $_SESSION['role'] ?? 'cashier' ?>';
+
+function viewSaleDetail(invoiceNo) {
+    currentInvoiceNo = invoiceNo;
+    // Show modal with loading state
+    let modal = new bootstrap.Modal(document.getElementById('saleDetailModal'));
+    $('#saleDetailContent').html(`
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Loading transaction...</p>
+        </div>
+    `);
+    modal.show();
+
+    // Fetch sale details via AJAX
+    $.get('ajax_sale_detail.php?invoice=' + encodeURIComponent(invoiceNo), function(data) {
+        if (data.success) {
+            let s = data.sale;
+            currentSaleId = s.id;
+            currentPrintCount = parseInt(s.print_count) || 0;
+
+            let itemsHtml = '';
+            data.items.forEach(function(item) {
+                itemsHtml += `
+                    <tr>
+                        <td style="font-size: 13px;">${item.product_name}</td>
+                        <td class="text-center">${item.quantity}</td>
+                        <td class="text-end">LKR ${parseFloat(item.selling_price).toFixed(2)}</td>
+                        <td class="text-end">LKR ${parseFloat(item.subtotal).toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            // If print count is 1 or more, it means it's been printed already
+            let watermarkHtml = '';
+            if (currentPrintCount >= 1) {
+                watermarkHtml = `
+                    <div class="watermark-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 2.8rem; font-weight: 900; color: rgba(220, 53, 69, 0.12); border: 4px double rgba(220, 53, 69, 0.12); padding: 5px 15px; border-radius: 8px; z-index: 0; pointer-events: none; white-space: nowrap; letter-spacing: 3px;">2ND COPY</div>
+                `;
+            }
+
+            let receiptHtml = `
+                <div class="thermal-receipt-preview" id="saleDetailReceipt" style="max-width: 100%; box-shadow: none; border: none; position: relative; overflow: hidden; padding: 10px;">
+                    ${watermarkHtml}
+                    <div style="position: relative; z-index: 1;">
+                        <div class="text-center">
+                            <h2 style="margin: 0; font-weight: 800; font-size: 1.5rem; letter-spacing: 1px;">DXL FASHION</h2>
+                            <p style="margin: 5px 0;">123 Style Street, City<br>Phone: 123-456-7890</p>
+                            <div class="dashed-line"></div>
+                            <h3 style="margin: 5px 0; font-weight: 700; font-size: 1.1rem; letter-spacing: 2px;">TRANSACTION DETAIL</h3>
+                            <div class="dashed-line"></div>
+                        </div>
+                        <div style="font-size: 13px; margin: 10px 0;">
+                            <p style="margin: 3px 0;"><strong>Invoice:</strong> ${s.invoice_no}</p>
+                            <p style="margin: 3px 0;"><strong>Date:</strong> ${s.sale_date}</p>
+                            <p style="margin: 3px 0;"><strong>Cashier:</strong> ${s.cashier_name}</p>
+                            <p style="margin: 3px 0;"><strong>Customer:</strong> ${s.customer_name}</p>
+                        </div>
+                        <div class="dashed-line"></div>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 1px dashed #000;">
+                                    <th style="text-align: left; padding: 5px 0; font-size: 13px;">Item</th>
+                                    <th style="text-align: center; padding: 5px 0; font-size: 13px;">Qty</th>
+                                    <th style="text-align: right; padding: 5px 0; font-size: 13px;">Price</th>
+                                    <th style="text-align: right; padding: 5px 0; font-size: 13px;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>${itemsHtml}</tbody>
+                        </table>
+                        <div class="dashed-line"></div>
+                        <table style="width: 100%; font-size: 13px;">
+                            <tr><td>Subtotal:</td><td style="text-align: right;">LKR ${parseFloat(s.subtotal).toFixed(2)}</td></tr>
+                            <tr><td>Discount:</td><td style="text-align: right; color: #dc3545;">-LKR ${parseFloat(s.discount).toFixed(2)}</td></tr>
+                            <tr><td>Tax:</td><td style="text-align: right;">+LKR ${parseFloat(s.tax).toFixed(2)}</td></tr>
+                        </table>
+                        <div class="dashed-line"></div>
+                        <div class="d-flex justify-content-between" style="font-size: 1.1rem; font-weight: 800;">
+                            <span>GRAND TOTAL</span>
+                            <span style="color: #0f62fe;">LKR ${parseFloat(s.total_amount).toFixed(2)}</span>
+                        </div>
+                        <div class="dashed-line"></div>
+                        <table style="width: 100%; font-size: 13px;">
+                            <tr><td>Paid (${s.payment_method}):</td><td style="text-align: right;">LKR ${parseFloat(s.paid_amount).toFixed(2)}</td></tr>
+                            <tr><td>Change:</td><td style="text-align: right;">LKR ${parseFloat(s.balance).toFixed(2)}</td></tr>
+                        </table>
+                        <div class="dashed-line"></div>
+                        <div class="text-center mt-3" style="border: 4px double #10b981; padding: 8px; border-radius: 8px;">
+                            <span style="color: #10b981; font-weight: 900; font-size: 1.4rem; letter-spacing: 3px;">✓ PAID</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('#saleDetailContent').html(receiptHtml);
+        } else {
+            $('#saleDetailContent').html(`
+                <div class="text-center py-5 text-danger">
+                    <i class="fas fa-exclamation-circle fs-1 mb-2"></i>
+                    <p>${data.message || 'Failed to load transaction details.'}</p>
+                </div>
+            `);
+        }
+    }, 'json').fail(function() {
+        $('#saleDetailContent').html(`
+            <div class="text-center py-5 text-danger">
+                <i class="fas fa-exclamation-circle fs-1 mb-2"></i>
+                <p>Network error. Please try again.</p>
+            </div>
+        `);
+    });
+}
+
+function printSaleDetail() {
+    let content = document.getElementById('saleDetailReceipt');
+    if (!content) return;
+
+    if (currentPrintCount >= 1 && userRole !== 'admin') {
+        // Require PIN
+        $('#adminPinInput').val('');
+        let pinModal = new bootstrap.Modal(document.getElementById('adminPinModal'));
+        pinModal.show();
+    } else {
+        // Admin or first print
+        executePrint();
+    }
+}
+
+function verifyAdminPinAndPrint() {
+    let pin = $('#adminPinInput').val();
+    if (!pin) {
+        alert("Please enter PIN");
+        return;
+    }
+    $.post('api/verify_admin.php', { pin: pin }, function(response) {
+        if (response.success) {
+            // Hide PIN Modal
+            let pinModalEl = document.getElementById('adminPinModal');
+            let modalInstance = bootstrap.Modal.getInstance(pinModalEl);
+            if (modalInstance) modalInstance.hide();
+            executePrint();
+        } else {
+            alert(response.message || "Invalid Admin PIN");
+        }
+    }, 'json');
+}
+
+function executePrint() {
+    $.post('api/increment_print.php', { sale_id: currentSaleId }, function(res) {
+        if (res.success) {
+            let content = document.getElementById('saleDetailReceipt');
+            $('#printDetailContainer').html(content.outerHTML);
+            document.body.classList.add('receipt-printing');
+            window.print();
+            setTimeout(() => { 
+                document.body.classList.remove('receipt-printing'); 
+                // Refresh modal to reflect incremented count and watermark
+                viewSaleDetail(currentInvoiceNo);
+            }, 1000);
+        } else {
+            alert("Failed to track print: " + res.message);
+        }
+    }, 'json');
+}
+</script>
+
+<style>
+.dashboard-tile {
+    transition: all 0.25s ease;
+    cursor: pointer;
+}
+.dashboard-tile:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+.sale-row:hover {
+    background-color: #eef2ff !important;
+}
+.sale-row td {
+    transition: all 0.15s ease;
+}
+</style>
 
 <?php require_once 'includes/footer.php'; ?>

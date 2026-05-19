@@ -10,7 +10,7 @@ if(isset($_SESSION['user_id'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - DX Fashion</title>
+    <title>Login - DXL Fashion</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/css/style.css" rel="stylesheet">
@@ -49,7 +49,7 @@ if(isset($_SESSION['user_id'])) {
             <div class="card login-card">
                 <div class="row g-0">
                     <div class="col-md-5 login-left text-center">
-                        <h2 class="fw-bold mb-3">DX Fashion</h2>
+                        <h2 class="fw-bold mb-3">DXL Fashion</h2>
                         <p>Welcome back! Please login to your account to manage sales and inventory.</p>
                     </div>
                     <div class="col-md-7 login-right">
