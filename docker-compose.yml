@@ -1,0 +1,48 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pos_web
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/var/www/html
+      # Don't overwrite the vendor or system packages if we ever install composer packages,
+      # but standard PHP workspace mapping is fine.
+    environment:
+      - DB_HOST=db
+      - DB_NAME=fashion_pos
+      - DB_USER=pos_admin
+      - DB_PASS=pos_secure_password
+      - DB_PORT=3306
+    depends_on:
+      - db
+    networks:
+      - pos_network
+
+  db:
+    image: mysql:8.0
+    container_name: pos_db
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      - MYSQL_DATABASE=fashion_pos
+      - MYSQL_USER=pos_admin
+      - MYSQL_PASSWORD=pos_secure_password
+      - MYSQL_ROOT_PASSWORD=root_secure_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      # Auto-seeding database schema and initial data
+      - ./sql/fashion_pos.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - pos_network
+
+volumes:
+  db_data:
+
+networks:
+  pos_network:
+    driver: bridge
