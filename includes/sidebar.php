@@ -40,6 +40,12 @@ $role = $_SESSION['role'] ?? 'cashier';
         <li class="border-top mt-3 pt-3">
             <span class="ps-3 text-muted small fw-bold">ADMINISTRATION</span>
         </li>
+        <li class="<?= $current_page == 'day_end.php' ? 'active' : '' ?>">
+            <a href="day_end.php" style="color: #0f62fe; font-weight: 700;"><i class="fas fa-calendar-check text-primary"></i> Day End Process</a>
+        </li>
+        <li class="<?= $current_page == 'item_registration.php' ? 'active' : '' ?>">
+            <a href="item_registration.php"><i class="fas fa-layer-group"></i> Item Registration</a>
+        </li>
         <li class="<?= $current_page == 'suppliers.php' ? 'active' : '' ?>">
             <a href="suppliers.php"><i class="fas fa-truck"></i> Suppliers</a>
         </li>

@@ -111,12 +111,6 @@ $brands = $pdo->query("SELECT * FROM brands ORDER BY brand_name")->fetchAll();
                 <i class="fas fa-percentage"></i>
             </button>
             
-            <?php if ($role === 'admin'): ?>
-            <!-- Orange Add Product Button -->
-            <button class="btn btn-orange-premium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#productModal" onclick="resetForm()">
-                <i class="fas fa-plus"></i> Add Product
-            </button>
-            <?php endif; ?>
             
             <!-- White Download Button -->
             <button class="btn btn-light px-3 py-2 border-0" onclick="window.print()" title="Print Inventory Report">

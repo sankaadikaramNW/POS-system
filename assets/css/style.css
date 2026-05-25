@@ -768,4 +768,77 @@ body {
     }
 }
 
+/* ==========================================================================
+   MOBILE & RESPONSIVE UX OVERHAUL
+   ========================================================================== */
+@media (max-width: 768px) {
+    /* Responsive Absolute Drawer Sidebar */
+    #sidebar {
+        position: fixed !important;
+        z-index: 9999 !important;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        margin-left: -320px;
+        box-shadow: 8px 0 25px rgba(0, 0, 0, 0.2);
+    }
+    #sidebar.active {
+        margin-left: 0 !important;
+    }
+    
+    /* Top Navbar Responsive Sizing */
+    .navbar {
+        height: auto !important;
+        min-height: 70px !important;
+        padding: 10px 15px !important;
+    }
+    .navbar .container-fluid {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .navbar .ms-auto {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 8px;
+        margin-top: 4px;
+    }
+    
+    /* Container & Page Padding Adjustments */
+    #content > .container-fluid {
+        padding: 15px 12px !important;
+    }
+    
+    /* Premium whitish table enhancements on mobile */
+    .premium-dark-page .table th {
+        padding: 8px !important;
+        font-size: 0.72rem !important;
+    }
+    .premium-dark-page .table td {
+        padding: 10px 8px !important;
+        font-size: 0.78rem !important;
+    }
+    
+    /* Shrink Circular Avatar slightly on mobile */
+    .product-avatar-circle, .product-avatar-fallback {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 12px !important;
+    }
+    
+    /* Stack generic grid rows beautifully */
+    .row {
+        --bs-gutter-x: 12px;
+    }
+    
+    /* Item Registration forms stacking */
+    .reg-card {
+        padding: 16px !important;
+        margin-bottom: 15px;
+    }
+}
+
+
 
