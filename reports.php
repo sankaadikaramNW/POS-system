@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once 'config/database.php';
 require_once 'includes/header.php';
 
@@ -13,7 +13,8 @@ $f_date_to   = trim($_GET['date_to']   ?? '');
 $f_payment   = trim($_GET['payment']   ?? '');
 $f_user      = (int)($_GET['user_id']  ?? 0);
 $f_item_code = trim($_GET['item_code'] ?? '');
-$f_customer  = (int)($_GET['customer_id'] ?? 0);
+$f_customer   = (int)($_GET['customer_id'] ?? 0);
+$f_card_ref   = trim($_GET['card_ref'] ?? '');
 
 // ── Build query ────────────────────────────────────────────
 $where  = ["1=1"];
@@ -25,6 +26,7 @@ if ($f_date_to)   { $where[] = "DATE(s.sale_date) <= ?";     $params[] = $f_date
 if ($f_payment)   { $where[] = "s.payment_method = ?";       $params[] = $f_payment; }
 if ($f_user)      { $where[] = "s.created_by = ?";           $params[] = $f_user; }
 if ($f_customer)  { $where[] = "s.customer_id = ?";          $params[] = $f_customer; }
+if ($f_card_ref)  { $where[] = "s.card_reference = ?";        $params[] = $f_card_ref; }
 
 // item code filter requires a subquery
 $item_join = '';
@@ -179,6 +181,10 @@ foreach ($sales as $s) {
             <input type="checkbox" id="chk_customer" class="criteria-chk d-none" onchange="toggleCriteria('customer')">
             <span class="criteria-pill"><i class="fas fa-user-friends me-1"></i> Customer</span>
         </label>
+        <label class="criteria-pill-label">
+            <input type="checkbox" id="chk_card_ref" class="criteria-chk d-none" onchange="toggleCriteria('card_ref')">
+            <span class="criteria-pill"><i class="fas fa-credit-card me-1"></i> Card Ref</span>
+        </label>
     </div>
 
     <style>
@@ -235,6 +241,10 @@ foreach ($sales as $s) {
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div class="col-md-4 col-lg-2 criteria-field-group" id="grp_card_ref">
+                <label class="filter-label">Card Reference (Last 4)</label>
+                <input type="text" name="card_ref" id="input_card_ref" class="form-control form-control-sm text-center fw-bold" maxlength="4" placeholder="e.g. 1234" inputmode="numeric" value="<?= htmlspecialchars($f_card_ref) ?>" style="letter-spacing:4px;">
+            </div>
             <div class="col-md-4 col-lg-2 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-orange-premium btn-sm flex-grow-1"><i class="fas fa-search me-1"></i>Apply</button>
                 <a href="reports.php" class="btn btn-dark-premium btn-sm"><i class="fas fa-times"></i></a>
@@ -274,6 +284,7 @@ foreach ($sales as $s) {
                     <th>Customer</th>
                     <th>Cashier</th>
                     <th>Status &amp; Payment</th>
+                    <th>Card Ref</th>
                     <th class="text-end">Subtotal</th>
                     <th class="text-end">Discount</th>
                     <th class="text-end">Total</th>
@@ -306,6 +317,9 @@ foreach ($sales as $s) {
                     <?php else: ?>
                         <span class="badge bg-success ms-1" style="font-size:.72rem; font-weight:700;">COMPLETED</span>
                     <?php endif; ?>
+                </td>
+                <td class="text-center font-monospace fw-bold" style="color:#4f46e5;letter-spacing:3px;">
+                    <?= !empty($s['card_reference']) ? '&bull;&bull;&bull;&bull; ' . htmlspecialchars($s['card_reference']) : '<span class="text-muted" style="letter-spacing:normal;font-weight:400;font-size:.75rem;">â€”</span>' ?>
                 </td>
                 <td class="text-end">LKR <?= number_format($s['total_amount'] + $s['discount'], 2) ?></td>
                 <td class="text-end text-danger">-LKR <?= number_format($s['discount'],2) ?></td>
@@ -388,12 +402,13 @@ document.addEventListener("DOMContentLoaded", function() {
     const urlParams = new URLSearchParams(window.location.search);
     
     const criteriaMapping = {
-        'invoice': urlParams.get('invoice'),
-        'date': urlParams.get('date_from') || urlParams.get('date_to'),
-        'payment': urlParams.get('payment'),
-        'user': urlParams.get('user_id') && urlParams.get('user_id') !== '0',
-        'item': urlParams.get('item_code'),
-        'customer': urlParams.get('customer_id') && urlParams.get('customer_id') !== '0'
+        'invoice':  urlParams.get('invoice'),
+        'date':     urlParams.get('date_from') || urlParams.get('date_to'),
+        'payment':  urlParams.get('payment'),
+        'user':     urlParams.get('user_id') && urlParams.get('user_id') !== '0',
+        'item':     urlParams.get('item_code'),
+        'customer': urlParams.get('customer_id') && urlParams.get('customer_id') !== '0',
+        'card_ref': urlParams.get('card_ref')
     };
 
     // If no filters are active, default to checking date and customer as standard quick filters
@@ -412,7 +427,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // Call toggle on each key to update visibility states
-    ['invoice', 'date', 'payment', 'user', 'item', 'customer'].forEach(toggleCriteria);
+    ['invoice', 'date', 'payment', 'user', 'item', 'customer', 'card_ref'].forEach(toggleCriteria);
 });
 
 function quickSearch(val) {
@@ -493,6 +508,7 @@ function viewDetail(invoiceNo) {
                             <span class="badge" style="background:rgba(16,163,74,.12);color:#16a34a;">${s.payment_method}</span>
                             <span class="badge ${s.status === 'CANCELLED' ? 'bg-danger' : 'bg-success'}">${s.status}</span>
                         </div>
+                        ${s.card_reference ? `<div style="margin-top:6px;font-size:.82rem;color:#4f46e5;font-weight:600;letter-spacing:2px;"><i class="fas fa-credit-card me-1" style="font-size:.72rem;"></i> Card Ref: &bull;&bull;&bull;&bull; ${s.card_reference}</div>` : ''}
                     </div>
                     ${stampHtml}
                     ${cancelBtnHtml}
@@ -542,3 +558,4 @@ function confirmCancelSale(invoiceNo) {
 </script>
 
 <?php require_once 'includes/footer.php'; ?>
+

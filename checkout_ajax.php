@@ -40,7 +40,21 @@ $tax_percent      = (float)($_POST['tax']      ?? 0);
 $payment_method   = $_POST['payment_method'] ?? 'Cash';
 $paid_amount      = (float)($_POST['paid_amount'] ?? 0);
 $created_by       = (int)$_SESSION['user_id'];
+$card_reference   = strtoupper(trim($_POST['card_reference'] ?? ''));
 $invoice_no       = 'INV-' . date('ymd') . '-' . strtoupper(substr(uniqid(), -5));
+
+// ── Server-side card reference validation ────────────────────────────
+if ($payment_method === 'Card') {
+    if (!preg_match('/^[0-9]{4}$/', $card_reference)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Card payment requires exactly 4 numeric digits from the card machine receipt.'
+        ]);
+        exit();
+    }
+} else {
+    $card_reference = null; // Only store for Card payments
+}
 
 try {
     $pdo->beginTransaction();
@@ -108,13 +122,13 @@ try {
     // ─── STEP 3: Create Sale Invoice ────────────────────────────────────────
     $stmt = $pdo->prepare("
         INSERT INTO sales
-            (invoice_no, customer_id, total_amount, discount, tax, payment_method, paid_amount, balance, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (invoice_no, customer_id, total_amount, discount, tax, payment_method, card_reference, paid_amount, balance, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
         $invoice_no, $customer_id, $total_amount,
         $discount_amount, $tax_amount, $payment_method,
-        $paid_amount, $balance, $created_by
+        $card_reference, $paid_amount, $balance, $created_by
     ]);
     $sale_id = (int)$pdo->lastInsertId();
 
@@ -254,6 +268,7 @@ try {
         'paid_amount'    => $paid_amount,
         'balance'        => abs($balance),
         'payment_method' => $payment_method,
+        'card_reference' => $card_reference,
         'items'          => $purchased_items
     ]);
 

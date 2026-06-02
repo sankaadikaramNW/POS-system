@@ -162,7 +162,7 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                             <div class="row g-2 mb-2">
                                 <div class="col-6">
                                     <label class="text-muted mb-1" style="font-size: 0.7rem;">Payment Method</label>
-                                    <select name="payment_method" id="paymentMethod" class="form-select form-select-sm" required style="height:28px; font-size:0.8rem;">
+                                    <select name="payment_method" id="paymentMethod" class="form-select form-select-sm" required style="height:28px; font-size:0.8rem;" onchange="toggleCardRefField()">
                                         <option value="Cash">Cash</option>
                                         <option value="Card">Card</option>
                                         <option value="Mobile">Mobile</option>
@@ -171,6 +171,25 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                                 <div class="col-6">
                                     <label class="text-muted mb-1" style="font-size: 0.7rem;">Paid Amount (LKR)</label>
                                     <input type="number" step="0.01" name="paid_amount" id="paidAmount" class="form-control form-control-sm text-end" required style="height:28px; font-size:0.8rem;">
+                                </div>
+                            </div>
+
+                            <!-- Card Reference Row — shown only when Card is selected -->
+                            <div class="row g-2 mb-2" id="cardRefRow" style="display:none !important;">
+                                <div class="col-12">
+                                    <label class="mb-1 fw-semibold" style="font-size: 0.7rem; color: #4f46e5;">
+                                        <i class="fas fa-credit-card me-1"></i>
+                                        Card Reference <span class="text-danger">*</span> <span style="font-weight:400; color:#64748b;">(Last 4 digits from receipt)</span>
+                                    </label>
+                                    <input type="text" id="cardReference" name="card_reference"
+                                        class="form-control form-control-sm text-center fw-bold"
+                                        maxlength="4" placeholder="_ _ _ _"
+                                        inputmode="numeric" pattern="[0-9]{4}"
+                                        autocomplete="off"
+                                        style="height:34px; font-size:1.05rem; letter-spacing:6px; border:2px solid #4f46e5; border-radius:8px; color:#4f46e5; background:rgba(79,70,229,0.04);">
+                                    <div class="invalid-feedback" id="cardRefError" style="display:none; font-size:0.72rem; color:#dc2626; margin-top:3px;">
+                                        <i class="fas fa-exclamation-circle me-1"></i>Please enter the last 4 digits from the card machine receipt.
+                                    </div>
                                 </div>
                             </div>
                             
@@ -264,6 +283,10 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                         <tr style="font-weight: 600;">
                             <td style="border:none;">Change Due:</td>
                             <td style="border:none; text-align: right;" id="rBalance">LKR 0.00</td>
+                        </tr>
+                        <tr id="rCardRefRow" style="display:none;">
+                            <td style="border:none; font-weight: 500; color:#4f46e5;"><i class="fas fa-credit-card" style="font-size:10px;"></i> Card Ref:</td>
+                            <td style="border:none; text-align: right; font-weight:700; color:#4f46e5; letter-spacing:3px;" id="rCardRef">&mdash;</td>
                         </tr>
                     </table>
                     
@@ -526,11 +549,20 @@ function submitCheckout(e) {
         return;
     }
 
-    let customerId = $('#customerId').val();
-    let discount = $('#discount').val();
-    let tax = $('#tax').val();
+    let customerId    = $('#customerId').val();
+    let discount      = $('#discount').val();
+    let tax           = $('#tax').val();
     let paymentMethod = $('#paymentMethod').val();
-    let paidAmount = $('#paidAmount').val();
+    let paidAmount    = $('#paidAmount').val();
+    let cardReference = $('#cardReference').val().trim();
+
+    // Card Reference Validation
+    if (paymentMethod === 'Card') {
+        if (!validateCardRef(cardReference)) {
+            $('#cardReference').focus();
+            return;
+        }
+    }
 
     // Check paid amount validation
     let grandTotal = parseFloat($('#grandTotal').text().replace('LKR ', ''));
@@ -539,23 +571,26 @@ function submitCheckout(e) {
         return;
     }
 
-    // Submit checkout via AJAX
+    // Disable submit button to prevent duplicate submissions
+    const $submitBtn = $('#checkoutForm button[type="submit"]');
+    $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Processing...');
+
     $.ajax({
         type: 'POST',
         url: 'checkout_ajax.php',
         data: {
-            cart_data: JSON.stringify(cart),
-            customer_id: customerId,
-            discount: discount,
-            tax: tax,
-            payment_method: paymentMethod,
-            paid_amount: paidAmount,
+            cart_data:            JSON.stringify(cart),
+            customer_id:          customerId,
+            discount:             discount,
+            tax:                  tax,
+            payment_method:       paymentMethod,
+            paid_amount:          paidAmount,
+            card_reference:       paymentMethod === 'Card' ? cardReference : '',
             resumed_hold_bill_no: $('#resumedHoldBillNo').val()
         },
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                // Populate Invoice Receipt details
                 $('#rInvoice').text(response.invoice_no);
                 $('#rDate').text(response.sale_date);
                 $('#rCashier').text(response.cashier_name);
@@ -568,31 +603,76 @@ function submitCheckout(e) {
                 $('#rBalance').text('LKR ' + parseFloat(response.balance).toFixed(2));
                 $('#rMethod').text(response.payment_method);
 
-                // Inject Item rows
+                // Card reference on receipt
+                if (response.card_reference) {
+                    $('#rCardRef').text('\u2022\u2022\u2022\u2022 ' + response.card_reference);
+                    $('#rCardRefRow').show();
+                } else {
+                    $('#rCardRefRow').hide();
+                }
+
                 let itemsHtml = '';
                 response.items.forEach(item => {
-                    itemsHtml += `
-                    <tr>
-                        <td style="text-align: left; padding: 4px 0;">${item.product_name}</td>
-                        <td style="text-align: center; padding: 4px 0;">${item.quantity}</td>
-                        <td style="text-align: right; padding: 4px 0;">${parseFloat(item.selling_price).toFixed(2)}</td>
-                        <td style="text-align: right; padding: 4px 0;">${parseFloat(item.subtotal).toFixed(2)}</td>
+                    itemsHtml += `<tr>
+                        <td style="text-align:left;padding:4px 0;">${item.product_name}</td>
+                        <td style="text-align:center;padding:4px 0;">${item.quantity}</td>
+                        <td style="text-align:right;padding:4px 0;">${parseFloat(item.selling_price).toFixed(2)}</td>
+                        <td style="text-align:right;padding:4px 0;">${parseFloat(item.subtotal).toFixed(2)}</td>
                     </tr>`;
                 });
                 $('#rItems').html(itemsHtml);
 
-                // Show Success Receipt Modal
                 let receiptModal = new bootstrap.Modal(document.getElementById('receiptModal'));
                 receiptModal.show();
             } else {
-                alert("Checkout Failed: " + response.message);
+                showPOSToast('Checkout Failed: ' + response.message, 'danger');
             }
         },
         error: function(xhr, status, error) {
-            alert("Error in network communication: " + error);
+            showPOSToast('Network error: ' + error, 'danger');
+        },
+        complete: function() {
+            $submitBtn.prop('disabled', false).html('<i class="fas fa-check-circle me-1"></i> Pay &amp; Checkout');
         }
     });
 }
+
+// Card Reference Helpers
+function toggleCardRefField() {
+    const method = $('#paymentMethod').val();
+    const row    = $('#cardRefRow');
+    const input  = $('#cardReference');
+    if (method === 'Card') {
+        row[0].style.setProperty('display', 'block', 'important');
+        input.focus();
+    } else {
+        row[0].style.setProperty('display', 'none', 'important');
+        input.val('');
+        $('#cardRefError').hide();
+        input.removeClass('is-invalid').css('border-color', '#4f46e5');
+    }
+}
+
+function validateCardRef(value) {
+    const $input = $('#cardReference');
+    const $error = $('#cardRefError');
+    const valid  = /^[0-9]{4}$/.test(value);
+    if (!valid) {
+        $input.addClass('is-invalid').css('border-color', '#dc2626');
+        $error.show();
+        return false;
+    }
+    $input.removeClass('is-invalid').css('border-color', '#4f46e5');
+    $error.hide();
+    return true;
+}
+
+// Live validation on input
+$(document).on('input', '#cardReference', function() {
+    const v = $(this).val().replace(/\D/g, '').substring(0, 4);
+    $(this).val(v);
+    if (v.length === 4) validateCardRef(v);
+});
 
 function printReceipt() {
     let receiptContent = document.getElementById('receiptPreview').outerHTML;
@@ -710,6 +790,10 @@ function resetPOSFields() {
     $('#paidAmount').val('');
     $('#saleNotes').val('');
     $('#resumedHoldBillNo').val('');
+    // Reset card reference field
+    $('#cardReference').val('').removeClass('is-invalid').css('border-color', '#4f46e5');
+    $('#cardRefError').hide();
+    toggleCardRefField(); // hides the card ref row
 }
 
 // Legacy alias kept so any old inline calls still work
@@ -1333,5 +1417,6 @@ function showPOSToast(message, type = 'success') {
 </script>
 
 <?php require_once 'includes/footer.php'; ?>
+
 
 

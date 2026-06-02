@@ -50,20 +50,21 @@ foreach ($items as $item) {
 echo json_encode([
     'success' => true,
     'sale' => [
-        'id' => $sale['id'],
-        'print_count' => (int)$sale['print_count'],
-        'invoice_no' => $sale['invoice_no'],
-        'sale_date' => date('d M Y H:i', strtotime($sale['sale_date'])),
-        'cashier_name' => $sale['cashier_name'] ?? 'System',
-        'customer_name' => $sale['customer_name'] ?? 'Walk-in Customer',
-        'subtotal' => $subtotal,
-        'discount' => (float)$sale['discount'],
-        'tax' => (float)$sale['tax'],
-        'total_amount' => (float)$sale['total_amount'],
-        'paid_amount' => (float)$sale['paid_amount'],
-        'balance' => abs((float)$sale['balance']),
+        'id'             => $sale['id'],
+        'print_count'    => (int)$sale['print_count'],
+        'invoice_no'     => $sale['invoice_no'],
+        'sale_date'      => date('d M Y H:i', strtotime($sale['sale_date'])),
+        'cashier_name'   => $sale['cashier_name'] ?? 'System',
+        'customer_name'  => $sale['customer_name'] ?? 'Walk-in Customer',
+        'subtotal'       => $subtotal,
+        'discount'       => (float)$sale['discount'],
+        'tax'            => (float)$sale['tax'],
+        'total_amount'   => (float)$sale['total_amount'],
+        'paid_amount'    => (float)$sale['paid_amount'],
+        'balance'        => abs((float)$sale['balance']),
         'payment_method' => $sale['payment_method'],
-        'status' => $sale['status']
+        'card_reference' => $sale['card_reference'] ?? null,
+        'status'         => $sale['status']
     ],
     'items' => $items
 ]);
