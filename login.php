@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once 'config/app.php';
 if(isset($_SESSION['user_id'])) {
     header("Location: dashboard.php");
     exit();
@@ -96,6 +97,21 @@ if(isset($_SESSION['user_id'])) {
             </div>
         </div>
     </div>
+</div>
+
+<!-- Version badge — bottom center -->
+<div style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100;">
+    <span style="
+        display:inline-flex;align-items:center;gap:6px;
+        background:rgba(255,255,255,0.85);backdrop-filter:blur(8px);
+        border:1px solid rgba(15,98,254,.2);
+        border-radius:20px;padding:5px 14px;
+        font-size:.72rem;font-weight:700;color:#64748b;
+        box-shadow:0 2px 12px rgba(15,23,42,.08);
+    ">
+        <i class="fas fa-code-branch" style="color:#0f62fe;font-size:.65rem;"></i>
+        <?= htmlspecialchars(APP_NAME) ?> &mdash; <?= htmlspecialchars(APP_SHORT_VERSION) ?>
+    </span>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

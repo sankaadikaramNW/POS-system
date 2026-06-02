@@ -8,6 +8,9 @@ if(!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// App configuration (version, name, environment)
+require_once __DIR__ . '/../config/app.php';
+
 // Prevent browser from caching protected pages — forces fresh request on back button
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Cache-Control: post-check=0, pre-check=0", false);
@@ -40,8 +43,14 @@ header("Expires: Sat, 01 Jan 2000 00:00:00 GMT");
                         <i class="fas fa-bars"></i>
                     </button>
                     
-                    <div class="ms-auto d-flex align-items-center">
-                        <span class="me-3 fw-bold"><i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['full_name'] ?? 'User'); ?> (<?= ucfirst(htmlspecialchars($_SESSION['role'] ?? '')) ?>)</span>
+                    <div class="ms-auto d-flex align-items-center gap-3">
+                        <!-- Version badge in topbar -->
+                        <span class="d-none d-lg-inline-flex align-items-center gap-1 px-2 py-1 rounded"
+                              style="background:rgba(15,98,254,.08);border:1px solid rgba(15,98,254,.15);font-size:.7rem;font-weight:700;color:#0f62fe;letter-spacing:.03em;">
+                            <i class="fas fa-code-branch" style="font-size:.65rem;"></i>
+                            <?= APP_VERSION ?>
+                        </span>
+                        <span class="fw-bold"><i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['full_name'] ?? 'User'); ?> (<?= ucfirst(htmlspecialchars($_SESSION['role'] ?? '')) ?>)</span>
                         <a href="logout.php" class="btn btn-danger btn-sm"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
                 </div>

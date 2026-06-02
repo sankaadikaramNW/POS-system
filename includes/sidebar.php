@@ -70,4 +70,26 @@ $role = $_SESSION['role'] ?? 'cashier';
         </li>
         <?php endif; ?>
     </ul>
+
+    <!-- Sidebar Version Footer -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 20px;border-top:1px solid rgba(255,255,255,0.07);background:#0c0d12;">
+        <?php if ($role === 'admin'): ?>
+        <a href="system_info.php" style="display:flex;align-items:center;gap:8px;text-decoration:none;margin-bottom:8px;padding:6px 8px;border-radius:8px;transition:background .2s;" onmouseover="this.style.background='rgba(15,98,254,.12)'" onmouseout="this.style.background='transparent'">
+            <i class="fas fa-info-circle" style="color:#0f62fe;font-size:.85rem;"></i>
+            <span style="font-size:.75rem;color:#94a3b8;font-weight:600;">System Information</span>
+        </a>
+        <?php endif; ?>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:.68rem;color:#475569;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">
+                <?php if (defined('APP_VERSION')) echo APP_VERSION; ?>
+            </span>
+            <span style="font-size:.65rem;color:#334155;">
+                <?php if (defined('APP_ENVIRONMENT') && APP_ENVIRONMENT !== 'Production'): ?>
+                <span style="color:#f97316;"><i class="fas fa-circle" style="font-size:.4rem;vertical-align:middle;"></i> <?= APP_ENVIRONMENT ?></span>
+                <?php else: ?>
+                <span style="color:#22c55e;"><i class="fas fa-circle" style="font-size:.4rem;vertical-align:middle;"></i> Production</span>
+                <?php endif; ?>
+            </span>
+        </div>
+    </div>
 </nav>
