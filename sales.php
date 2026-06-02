@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -45,7 +45,7 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
 <!-- Load jQuery Early to Ensure Inline Script works perfectly -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 
-<!-- Premium POS Screen Wrapper — Full Viewport -->
+<!-- Premium POS Screen Wrapper â€” Full Viewport -->
 <div class="premium-dark-page pos-viewport-wrapper">
     <div class="pos-layout-container">
         
@@ -61,7 +61,7 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                 <i class="fas fa-search position-absolute text-muted" style="left: 14px; top: 11px; font-size: 1rem;"></i>
             </div>
             
-            <!-- Category Scrollable Filter Pills — SINGLE LINE -->
+            <!-- Category Scrollable Filter Pills â€” SINGLE LINE -->
             <div class="d-flex overflow-auto mb-2 gap-2 align-items-center" style="white-space: nowrap; flex-shrink:0; padding-bottom: 8px;">
                 <a href="javascript:void(0)" class="pos-category-pill active" data-id="all" onclick="selectCategory('all', this)">All Products</a>
                 <?php foreach($categories as $cat): ?>
@@ -71,7 +71,7 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                 <?php endforeach; ?>
             </div>
             
-            <!-- Products Loaded dynamically via AJAX — scrolls internally -->
+            <!-- Products Loaded dynamically via AJAX â€” scrolls internally -->
             <div class="pos-product-grid-scroll">
                 <div class="row g-2 m-0" id="productList">
                     <!-- Product grid cards injected here -->
@@ -134,7 +134,7 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                         </table>
                     </div>
 
-                    <!-- Billing Calculations Footer Card — always visible -->
+                    <!-- Billing Calculations Footer Card â€” always visible -->
                     <div class="pos-billing-footer mt-auto" style="background: #ffffff !important; border: 1px solid var(--border-color-dark) !important;">
                         <div class="d-flex justify-content-between mb-1">
                             <span class="text-muted" style="font-size:0.85rem;">Subtotal:</span>
@@ -175,7 +175,7 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                             </div>
                             
                             <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-dark-premium py-1 fw-bold text-uppercase" onclick="clearCart()" style="font-size:0.8rem; width: 25%;">
+                                <button type="button" class="btn btn-dark-premium py-1 fw-bold text-uppercase" id="btnCancelTransaction" onclick="cancelPOSTransaction()" style="font-size:0.8rem; width: 25%;">
                                     <i class="fas fa-trash-alt me-1"></i> Cancel
                                 </button>
                                 <button type="button" class="btn btn-hold-premium py-1 fw-bold text-uppercase" onclick="holdCurrentBill()" style="font-size:0.8rem; width: 35%;">
@@ -546,26 +546,106 @@ function printReceipt() {
     setTimeout(() => { document.body.classList.remove('receipt-printing'); }, 1000);
 }
 
-function clearCart() {
-    if (confirm("Are you sure you want to cancel this sale and clear the cart?")) {
-        cart = [];
-        renderCart();
-        $('#customerId').val('');
-        $('#discount').val('0');
-        $('#tax').val('0');
-        $('#paymentMethod').val('Cash');
-        $('#paidAmount').val('');
-        $('#saleNotes').val('');
-        $('#resumedHoldBillNo').val('');
+// â”€â”€ Cancel / Clear Cart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let _cancelInProgress = false; // idempotency guard
+
+/**
+ * Entry-point: shows the Bootstrap confirmation modal.
+ * Only opens the modal if the cart actually has items.
+ */
+function cancelPOSTransaction() {
+    if (_cancelInProgress) return; // already processing
+
+    const resumedBillNo = $('#resumedHoldBillNo').val().trim();
+    const hasItems = cart.length > 0;
+
+    // Update modal sub-message depending on context
+    if (resumedBillNo) {
+        $('#cancelModalSubtext').text(
+            `Hold bill ${resumedBillNo} will be returned to the pending queue so it can be recalled later.`
+        );
+    } else if (hasItems) {
+        $('#cancelModalSubtext').text('All items in the current cart will be removed.');
+    } else {
+        // Nothing in cart â€” just reset fields silently
+        resetPOSFields();
+        return;
+    }
+
+    // Show the confirm modal
+    let modalEl  = document.getElementById('posCancelConfirmModal');
+    let modalInst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modalInst.show();
+}
+
+/**
+ * Called when the user clicks "Yes, Cancel" in the confirmation modal.
+ * Handles both plain new-bill cancellations and resumed-hold-bill reverts.
+ */
+function confirmCancelPOSTransaction() {
+    if (_cancelInProgress) return;
+    _cancelInProgress = true;
+
+    // Disable button to prevent double-fire
+    $('#btnConfirmCancelPOS').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Cancelling...');
+
+    const resumedBillNo = $('#resumedHoldBillNo').val().trim();
+
+    // Close the confirmation modal first
+    let modalEl   = document.getElementById('posCancelConfirmModal');
+    let modalInst = bootstrap.Modal.getInstance(modalEl);
+    if (modalInst) modalInst.hide();
+
+    if (resumedBillNo) {
+        // Resumed hold bill â€” revert it back to PENDING in DB
+        $.ajax({
+            type: 'POST',
+            url: 'api/pending_sales_api.php',
+            data: { action: 'revert_resume', hold_bill_no: resumedBillNo },
+            dataType: 'json',
+            success: function(response) {
+                if (!response.success) {
+                    // Non-fatal: log it but still clear the cart
+                    console.warn('[POS Cancel] revert_resume failed:', response.message);
+                }
+                resetPOSFields();
+                updateHeldCount();
+                loadProducts(); // refresh stock badges
+                showPOSToast(
+                    response.success
+                        ? `Hold bill ${resumedBillNo} returned to pending queue.`
+                        : 'Cart cleared (hold bill revert encountered an issue â€” check logs).',
+                    response.success ? 'success' : 'warning'
+                );
+            },
+            error: function(xhr, status, err) {
+                console.error('[POS Cancel] revert_resume network error:', err);
+                resetPOSFields(); // still clear cart even if API fails
+                loadProducts();
+                showPOSToast('Cart cleared (network error during hold-bill revert).', 'warning');
+            },
+            complete: function() {
+                _cancelInProgress = false;
+                $('#btnConfirmCancelPOS').prop('disabled', false).html('<i class="fas fa-trash-alt me-1"></i> Yes, Cancel');
+            }
+        });
+    } else {
+        // Plain new bill â€” just reset locally
+        resetPOSFields();
+        loadProducts(); // refresh stock badges
+        showPOSToast('Transaction cancelled. Cart cleared.', 'success');
+        _cancelInProgress = false;
+        $('#btnConfirmCancelPOS').prop('disabled', false).html('<i class="fas fa-trash-alt me-1"></i> Yes, Cancel');
     }
 }
 
-function startNewSale() {
-    // Reset Cart
+/**
+ * Resets all POS fields and cart state without any confirmation.
+ * Safe to call directly after a successful checkout.
+ */
+function resetPOSFields() {
     cart = [];
     renderCart();
-
-    // Reset customer selection
     $('#customerId').val('');
     $('#discount').val('0');
     $('#tax').val('0');
@@ -573,10 +653,19 @@ function startNewSale() {
     $('#paidAmount').val('');
     $('#saleNotes').val('');
     $('#resumedHoldBillNo').val('');
+}
+
+// Legacy alias kept so any old inline calls still work
+function clearCart() { cancelPOSTransaction(); }
+
+function startNewSale() {
+    resetPOSFields();
     updateHeldCount();
-    
+
     // Hide Receipt modal
-    bootstrap.Modal.getInstance(document.getElementById('receiptModal')).hide();
+    const receiptModalEl = document.getElementById('receiptModal');
+    const receiptModal   = bootstrap.Modal.getInstance(receiptModalEl);
+    if (receiptModal) receiptModal.hide();
 
     // Reload products to update stocks
     loadProducts();
@@ -893,7 +982,7 @@ function recallHeldBill(holdBillNo) {
                     rawCart = JSON.parse(bill.cart_data_json);
                 } catch(e) { rawCart = []; }
 
-                // ── Re-validate stock from DB before loading recalled cart ──
+                // â”€â”€ Re-validate stock from DB before loading recalled cart â”€â”€
                 // This prevents stale maxStock from hold time causing over-sell
                 $.ajax({
                     type: 'POST',
@@ -918,15 +1007,15 @@ function recallHeldBill(holdBillNo) {
                                 // Cap qty to available
                                 finalQty = liveStock;
                                 if (finalQty === 0) {
-                                    warnings.push(`⚠ "${escapeHtml(i.name)}" is now OUT OF STOCK (removed from cart).`);
+                                    warnings.push(`âš  "${escapeHtml(i.name)}" is now OUT OF STOCK (removed from cart).`);
                                     return null; // Remove from cart
                                 } else {
-                                    warnings.push(`⚠ "${escapeHtml(i.name)}": reduced from ${itemQty} to ${finalQty} (current stock: ${liveStock}).`);
+                                    warnings.push(`âš  "${escapeHtml(i.name)}": reduced from ${itemQty} to ${finalQty} (current stock: ${liveStock}).`);
                                 }
                             }
 
                             if (!stockMap[itemId] || !stockMap[itemId].product_exists) {
-                                warnings.push(`⚠ "${escapeHtml(i.name)}" no longer exists in the database — removed from cart.`);
+                                warnings.push(`âš  "${escapeHtml(i.name)}" no longer exists in the database â€” removed from cart.`);
                                 return null;
                             }
 
@@ -997,32 +1086,51 @@ function recallHeldBill(holdBillNo) {
     });
 }
 
-// Discard Held Bill
+// Discard Held Bill â€” from the modal list inside POS
+let _deletingBill = false; // idempotency guard
+
 function deleteHeldBill(holdBillNo) {
-    if (!confirm("Are you sure you want to permanently discard this held bill?\nThis action will cancel the bill in the database and audit trail.")) return;
-    
-    $.ajax({
-        type: 'GET',
-        url: 'api/pending_sales_api.php',
-        data: { action: 'cancel', hold_bill_no: holdBillNo },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                // Update counter
-                updateHeldCount();
-                
-                // Reload list
-                loadHeldBillsList();
-                
-                alert("Held bill discarded successfully.");
-            } else {
-                alert("Failed to cancel bill: " + response.message);
+    if (_deletingBill) return;
+
+    // Use Bootstrap modal confirmation
+    $('#heldBillDiscardNo').text(holdBillNo);
+    let confirmEl   = document.getElementById('heldBillDiscardModal');
+    let confirmInst = bootstrap.Modal.getInstance(confirmEl) || new bootstrap.Modal(confirmEl);
+
+    // Wire confirm button (unbind first to prevent stacking)
+    $('#btnConfirmDiscardHeld').off('click').on('click', function() {
+        if (_deletingBill) return;
+        _deletingBill = true;
+
+        const $btn = $(this);
+        $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Discarding...');
+        confirmInst.hide();
+
+        $.ajax({
+            type: 'POST',
+            url: 'api/pending_sales_api.php',
+            data: { action: 'cancel', hold_bill_no: holdBillNo },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    updateHeldCount();
+                    loadHeldBillsList();
+                    showPOSToast('Hold bill ' + holdBillNo + ' discarded.', 'success');
+                } else {
+                    showPOSToast('Failed to discard: ' + response.message, 'danger');
+                }
+            },
+            error: function(xhr, status, error) {
+                showPOSToast('Network error while discarding bill: ' + error, 'danger');
+            },
+            complete: function() {
+                _deletingBill = false;
+                $btn.prop('disabled', false).html('<i class="fas fa-trash-alt me-1"></i> Yes, Discard');
             }
-        },
-        error: function(xhr, status, error) {
-            alert("Error cancelling held bill: " + error);
-        }
+        });
     });
+
+    confirmInst.show();
 }
 
 $(document).ready(function() {
@@ -1039,7 +1147,7 @@ $(document).ready(function() {
         try {
             let rawCart = JSON.parse(resumedBillData.cart_data_json);
 
-            // ── Validate recalled cart stock from DB before restoring ──
+            // â”€â”€ Validate recalled cart stock from DB before restoring â”€â”€
             $.ajax({
                 type: 'POST',
                 url: 'api/stock_check.php',
@@ -1062,15 +1170,15 @@ $(document).ready(function() {
                         if (stockMap[itemId] && !stockMap[itemId].sufficient) {
                             finalQty = liveStock;
                             if (finalQty === 0) {
-                                warnings.push(`⚠ "${escapeHtml(i.name)}" is now OUT OF STOCK — removed.`);
+                                warnings.push(`âš  "${escapeHtml(i.name)}" is now OUT OF STOCK â€” removed.`);
                                 return null;
                             } else {
-                                warnings.push(`⚠ "${escapeHtml(i.name)}": qty reduced ${itemQty}→${finalQty} (stock: ${liveStock}).`);
+                                warnings.push(`âš  "${escapeHtml(i.name)}": qty reduced ${itemQty}â†’${finalQty} (stock: ${liveStock}).`);
                             }
                         }
 
                         if (!stockMap[itemId] || !stockMap[itemId].product_exists) {
-                            warnings.push(`⚠ "${escapeHtml(i.name)}" no longer exists — removed.`);
+                            warnings.push(`âš  "${escapeHtml(i.name)}" no longer exists â€” removed.`);
                             return null;
                         }
 
@@ -1133,6 +1241,39 @@ $(document).ready(function() {
         }
     }
 });
+
+// â”€â”€ Toast Notification Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function showPOSToast(message, type = 'success') {
+    const toastId = 'posToast_' + Date.now();
+    const bgClass = type === 'success' ? 'bg-success' :
+                    type === 'warning' ? 'bg-warning text-dark' :
+                    type === 'danger'  ? 'bg-danger' : 'bg-primary';
+    const icon    = type === 'success' ? 'fa-check-circle' :
+                    type === 'warning' ? 'fa-exclamation-triangle' :
+                    type === 'danger'  ? 'fa-times-circle' : 'fa-info-circle';
+
+    const toastHtml = `
+        <div id="${toastId}" class="toast align-items-center text-white border-0 ${bgClass}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="4000">
+            <div class="d-flex">
+                <div class="toast-body fw-semibold" style="font-size:0.88rem;">
+                    <i class="fas ${icon} me-2"></i>${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>`;
+
+    // Ensure container exists
+    if (!$('#posToastContainer').length) {
+        $('body').append('<div id="posToastContainer" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:9999;"></div>');
+    }
+
+    $('#posToastContainer').append(toastHtml);
+    const toastEl   = document.getElementById(toastId);
+    const toastInst = new bootstrap.Toast(toastEl);
+    toastInst.show();
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+}
 </script>
 
 <?php require_once 'includes/footer.php'; ?>
+

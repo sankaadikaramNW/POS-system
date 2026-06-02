@@ -10,11 +10,14 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$action = $_GET['action'] ?? '';
-$user_id = $_SESSION['user_id'];
+// Accept action from GET (reads) or POST (writes) — POST takes priority
+$action   = $_POST['action'] ?? $_GET['action'] ?? '';
+$user_id  = $_SESSION['user_id'];
 $username = $_SESSION['username'] ?? 'unknown';
 
 switch ($action) {
+
+    // ─────────────────────────────────────────────────────────────────────
     case 'hold':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
@@ -27,29 +30,26 @@ switch ($action) {
             exit();
         }
 
-        $customer_id = !empty($_POST['customer_id']) ? intval($_POST['customer_id']) : null;
-        $customer_name = $_POST['customer_name'] ?? 'Walk-in Customer';
-        $subtotal = floatval($_POST['subtotal'] ?? 0);
+        $customer_id     = !empty($_POST['customer_id']) ? intval($_POST['customer_id']) : null;
+        $customer_name   = $_POST['customer_name'] ?? 'Walk-in Customer';
+        $subtotal        = floatval($_POST['subtotal']        ?? 0);
         $discount_amount = floatval($_POST['discount_amount'] ?? 0);
-        $tax_amount = floatval($_POST['tax_amount'] ?? 0);
-        $grand_total = floatval($_POST['grand_total'] ?? 0);
-        $notes = $_POST['notes'] ?? '';
+        $tax_amount      = floatval($_POST['tax_amount']      ?? 0);
+        $grand_total     = floatval($_POST['grand_total']     ?? 0);
+        $notes           = $_POST['notes'] ?? '';
 
         try {
             $pdo->beginTransaction();
 
             // Generate Sequential Unique Hold Bill Number (HB-000001 format)
-            // Query for secure ID generation
-            $stmt = $pdo->query("SELECT COALESCE(MAX(id), 0) + 1 FROM pending_sales");
+            $stmt    = $pdo->query("SELECT COALESCE(MAX(id), 0) + 1 FROM pending_sales");
             $next_id = $stmt->fetchColumn();
-            
             $hold_bill_no = 'HB-' . str_pad($next_id, 6, '0', STR_PAD_LEFT);
 
-            // Double check uniqueness
+            // Double-check uniqueness
             $check_stmt = $pdo->prepare("SELECT COUNT(*) FROM pending_sales WHERE hold_bill_no = ?");
             $check_stmt->execute([$hold_bill_no]);
             if ($check_stmt->fetchColumn() > 0) {
-                // If by some race condition it exists, try to get a random addition or fail to ensure consistency
                 $hold_bill_no = 'HB-' . str_pad($next_id + rand(1, 99), 6, '0', STR_PAD_LEFT);
             }
 
@@ -60,19 +60,12 @@ switch ($action) {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, NOW(), NOW())
             ");
             $ins_stmt->execute([
-                $hold_bill_no,
-                $customer_id,
-                $customer_name,
-                $cart_data_json,
-                $subtotal,
-                $discount_amount,
-                $tax_amount,
-                $grand_total,
-                $notes,
-                $user_id
+                $hold_bill_no, $customer_id, $customer_name,
+                $cart_data_json, $subtotal, $discount_amount,
+                $tax_amount, $grand_total, $notes, $user_id
             ]);
 
-            // Add Audit Trail Log: Bill Held
+            // Audit Trail Log: Bill Held
             $log_stmt = $pdo->prepare("
                 INSERT INTO pending_sales_logs (user_id, username, action, log_date, log_time, bill_no) 
                 VALUES (?, ?, 'Bill Held', CURDATE(), CURTIME(), ?)
@@ -81,122 +74,108 @@ switch ($action) {
 
             $pdo->commit();
 
-            // Get active count
-            $cnt_stmt = $pdo->query("SELECT COUNT(*) FROM pending_sales WHERE status = 'PENDING'");
+            $cnt_stmt    = $pdo->query("SELECT COUNT(*) FROM pending_sales WHERE status = 'PENDING'");
             $active_count = $cnt_stmt->fetchColumn();
 
             echo json_encode([
-                'success' => true,
-                'message' => 'Bill held successfully.',
+                'success'      => true,
+                'message'      => 'Bill held successfully.',
                 'hold_bill_no' => $hold_bill_no,
                 'active_count' => $active_count
             ]);
 
         } catch (Exception $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log("[POS][pending_sales_api][hold] ERROR: " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => 'Database Error: ' . $e->getMessage()]);
         }
         break;
 
+    // ─────────────────────────────────────────────────────────────────────
     case 'count':
         try {
-            $stmt = $pdo->query("SELECT COUNT(*) FROM pending_sales WHERE status = 'PENDING'");
+            $stmt  = $pdo->query("SELECT COUNT(*) FROM pending_sales WHERE status = 'PENDING'");
             $count = $stmt->fetchColumn();
             echo json_encode(['success' => true, 'count' => $count]);
         } catch (Exception $e) {
+            error_log("[POS][pending_sales_api][count] ERROR: " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
         break;
 
+    // ─────────────────────────────────────────────────────────────────────
     case 'list':
-        $search = $_GET['search'] ?? '';
+        $search     = $_GET['search']     ?? '';
         $start_date = $_GET['start_date'] ?? '';
-        $end_date = $_GET['end_date'] ?? '';
-        $sort = $_GET['sort'] ?? 'created_at_desc';
-        $page = max(1, intval($_GET['page'] ?? 1));
-        $limit = max(1, intval($_GET['limit'] ?? 10));
-        $offset = ($page - 1) * $limit;
+        $end_date   = $_GET['end_date']   ?? '';
+        $sort       = $_GET['sort']       ?? 'created_at_desc';
+        $page       = max(1, intval($_GET['page']  ?? 1));
+        $limit      = max(1, intval($_GET['limit'] ?? 10));
+        $offset     = ($page - 1) * $limit;
 
         $conditions = ["status = 'PENDING'"];
-        $params = [];
+        $params     = [];
 
         if (!empty($search)) {
-            $conditions[] = "(hold_bill_no LIKE ? OR customer_name LIKE ? OR notes LIKE ?)";
-            $search_param = "%$search%";
-            $params[] = $search_param;
-            $params[] = $search_param;
-            $params[] = $search_param;
+            $conditions[]  = "(hold_bill_no LIKE ? OR customer_name LIKE ? OR notes LIKE ?)";
+            $search_param  = "%$search%";
+            $params[]      = $search_param;
+            $params[]      = $search_param;
+            $params[]      = $search_param;
         }
 
-        if (!empty($start_date)) {
-            $conditions[] = "DATE(created_at) >= ?";
-            $params[] = $start_date;
-        }
+        if (!empty($start_date)) { $conditions[] = "DATE(created_at) >= ?"; $params[] = $start_date; }
+        if (!empty($end_date))   { $conditions[] = "DATE(created_at) <= ?"; $params[] = $end_date;   }
 
-        if (!empty($end_date)) {
-            $conditions[] = "DATE(created_at) <= ?";
-            $params[] = $end_date;
-        }
-
-        $where = implode(' AND ', $conditions);
-
-        // Sorting mapping
+        $where    = implode(' AND ', $conditions);
         $order_by = "created_at DESC";
-        if ($sort === 'created_at_asc') {
-            $order_by = "created_at ASC";
-        } elseif ($sort === 'amount_desc') {
-            $order_by = "grand_total DESC";
-        } elseif ($sort === 'amount_asc') {
-            $order_by = "grand_total ASC";
-        }
+        if ($sort === 'created_at_asc') $order_by = "created_at ASC";
+        elseif ($sort === 'amount_desc')  $order_by = "grand_total DESC";
+        elseif ($sort === 'amount_asc')   $order_by = "grand_total ASC";
 
         try {
-            // Count total
-            $count_query = "SELECT COUNT(*) FROM pending_sales WHERE $where";
-            $c_stmt = $pdo->prepare($count_query);
+            $c_stmt = $pdo->prepare("SELECT COUNT(*) FROM pending_sales WHERE $where");
             $c_stmt->execute($params);
             $total_records = $c_stmt->fetchColumn();
-            $total_pages = ceil($total_records / $limit);
+            $total_pages   = max(1, ceil($total_records / $limit));
 
-            // Fetch records
-            $fetch_query = "
+            $f_stmt = $pdo->prepare("
                 SELECT ps.*, u.full_name as cashier_name 
                 FROM pending_sales ps
                 LEFT JOIN users u ON ps.cashier_id = u.id
                 WHERE $where
                 ORDER BY $order_by
                 LIMIT $limit OFFSET $offset
-            ";
-            $f_stmt = $pdo->prepare($fetch_query);
+            ");
             $f_stmt->execute($params);
             $bills = $f_stmt->fetchAll();
 
-            // Enrich each bill with standard formatted wait duration indicator
             $now = new DateTime();
             foreach ($bills as &$bill) {
-                $hold_time = new DateTime($bill['created_at']);
-                $interval = $now->diff($hold_time);
-                $minutes_elapsed = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
-                $bill['minutes_elapsed'] = $minutes_elapsed;
+                $hold_time          = new DateTime($bill['created_at']);
+                $interval           = $now->diff($hold_time);
+                $bill['minutes_elapsed'] = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
             }
 
             echo json_encode([
                 'success' => true,
-                'bills' => $bills,
+                'bills'   => $bills,
                 'pagination' => [
-                    'current_page' => $page,
-                    'limit' => $limit,
+                    'current_page'  => $page,
+                    'limit'         => $limit,
                     'total_records' => $total_records,
-                    'total_pages' => $total_pages
+                    'total_pages'   => $total_pages
                 ]
             ]);
         } catch (Exception $e) {
+            error_log("[POS][pending_sales_api][list] ERROR: " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
         break;
 
+    // ─────────────────────────────────────────────────────────────────────
     case 'details':
-        $hold_bill_no = $_GET['hold_bill_no'] ?? '';
+        $hold_bill_no = $_GET['hold_bill_no'] ?? $_POST['hold_bill_no'] ?? '';
         if (empty($hold_bill_no)) {
             echo json_encode(['success' => false, 'message' => 'Hold Bill Number is required.']);
             exit();
@@ -217,17 +196,16 @@ switch ($action) {
                 exit();
             }
 
-            echo json_encode([
-                'success' => true,
-                'bill' => $bill
-            ]);
+            echo json_encode(['success' => true, 'bill' => $bill]);
         } catch (Exception $e) {
+            error_log("[POS][pending_sales_api][details] ERROR: " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
         break;
 
+    // ─────────────────────────────────────────────────────────────────────
     case 'resume':
-        $hold_bill_no = $_GET['hold_bill_no'] ?? '';
+        $hold_bill_no = $_GET['hold_bill_no'] ?? $_POST['hold_bill_no'] ?? '';
         if (empty($hold_bill_no)) {
             echo json_encode(['success' => false, 'message' => 'Hold Bill Number is required.']);
             exit();
@@ -236,7 +214,7 @@ switch ($action) {
         try {
             $pdo->beginTransaction();
 
-            $stmt = $pdo->prepare("SELECT * FROM pending_sales WHERE hold_bill_no = ?");
+            $stmt = $pdo->prepare("SELECT * FROM pending_sales WHERE hold_bill_no = ? FOR UPDATE");
             $stmt->execute([$hold_bill_no]);
             $bill = $stmt->fetch();
 
@@ -245,14 +223,12 @@ switch ($action) {
             }
 
             if ($bill['status'] !== 'PENDING') {
-                throw new Exception('Prevent completed or cancelled bills from being resumed.');
+                throw new Exception('Only active PENDING bills can be resumed.');
             }
 
-            // Update status / timestamp
             $upd_stmt = $pdo->prepare("UPDATE pending_sales SET resumed_at = NOW(), updated_at = NOW() WHERE hold_bill_no = ?");
             $upd_stmt->execute([$hold_bill_no]);
 
-            // Add Audit Trail Log: Bill Resumed
             $log_stmt = $pdo->prepare("
                 INSERT INTO pending_sales_logs (user_id, username, action, log_date, log_time, bill_no) 
                 VALUES (?, ?, 'Bill Resumed', CURDATE(), CURTIME(), ?)
@@ -261,18 +237,25 @@ switch ($action) {
 
             $pdo->commit();
 
-            echo json_encode([
-                'success' => true,
-                'bill' => $bill
-            ]);
+            echo json_encode(['success' => true, 'bill' => $bill]);
         } catch (Exception $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log("[POS][pending_sales_api][resume] ERROR: " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
         break;
 
-    case 'cancel':
-        $hold_bill_no = $_GET['hold_bill_no'] ?? '';
+    // ─────────────────────────────────────────────────────────────────────
+    // NEW: revert_resume — called when a cashier cancels the POS cart after 
+    // resuming a hold bill without completing checkout. Reverts the bill back 
+    // to PENDING so it can be recalled by any cashier later.
+    case 'revert_resume':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'POST method required.']);
+            exit();
+        }
+
+        $hold_bill_no = trim($_POST['hold_bill_no'] ?? '');
         if (empty($hold_bill_no)) {
             echo json_encode(['success' => false, 'message' => 'Hold Bill Number is required.']);
             exit();
@@ -281,7 +264,67 @@ switch ($action) {
         try {
             $pdo->beginTransaction();
 
-            $stmt = $pdo->prepare("SELECT * FROM pending_sales WHERE hold_bill_no = ?");
+            // Lock and fetch the row
+            $stmt = $pdo->prepare("SELECT * FROM pending_sales WHERE hold_bill_no = ? FOR UPDATE");
+            $stmt->execute([$hold_bill_no]);
+            $bill = $stmt->fetch();
+
+            if (!$bill) {
+                // Bill not found — not a fatal error for the client (cart can still clear)
+                $pdo->rollBack();
+                echo json_encode(['success' => true, 'message' => 'Bill not found; cart cleared.']);
+                exit();
+            }
+
+            // Only revert if it's currently PENDING (i.e., was resumed but not completed)
+            if ($bill['status'] !== 'PENDING') {
+                $pdo->rollBack();
+                echo json_encode(['success' => true, 'message' => 'Bill already processed; cart cleared.']);
+                exit();
+            }
+
+            // Revert: clear resumed_at so it appears as if it was never resumed
+            $upd_stmt = $pdo->prepare("
+                UPDATE pending_sales 
+                SET resumed_at = NULL, updated_at = NOW() 
+                WHERE hold_bill_no = ?
+            ");
+            $upd_stmt->execute([$hold_bill_no]);
+
+            // Audit trail log
+            $log_stmt = $pdo->prepare("
+                INSERT INTO pending_sales_logs (user_id, username, action, log_date, log_time, bill_no) 
+                VALUES (?, ?, 'Resume Reverted (Cart Cancelled)', CURDATE(), CURTIME(), ?)
+            ");
+            $log_stmt->execute([$user_id, $username, $hold_bill_no]);
+
+            $pdo->commit();
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Hold bill {$hold_bill_no} reverted to pending queue."
+            ]);
+
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log("[POS][pending_sales_api][revert_resume] ERROR: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Revert failed: ' . $e->getMessage()]);
+        }
+        break;
+
+    // ─────────────────────────────────────────────────────────────────────
+    // cancel — accepts both POST (preferred) and GET (legacy fallback)
+    case 'cancel':
+        $hold_bill_no = trim($_POST['hold_bill_no'] ?? $_GET['hold_bill_no'] ?? '');
+        if (empty($hold_bill_no)) {
+            echo json_encode(['success' => false, 'message' => 'Hold Bill Number is required.']);
+            exit();
+        }
+
+        try {
+            $pdo->beginTransaction();
+
+            $stmt = $pdo->prepare("SELECT * FROM pending_sales WHERE hold_bill_no = ? FOR UPDATE");
             $stmt->execute([$hold_bill_no]);
             $bill = $stmt->fetch();
 
@@ -289,15 +332,26 @@ switch ($action) {
                 throw new Exception('Hold bill not found.');
             }
 
-            if ($bill['status'] !== 'PENDING') {
-                throw new Exception('Only active PENDING bills can be cancelled.');
+            if ($bill['status'] === 'CANCELLED') {
+                // Idempotent — already cancelled, no-op with success
+                $pdo->rollBack();
+                echo json_encode(['success' => true, 'message' => 'Bill was already cancelled.']);
+                exit();
             }
 
-            // Update status / timestamp
-            $upd_stmt = $pdo->prepare("UPDATE pending_sales SET status = 'CANCELLED', cancelled_at = NOW(), updated_at = NOW() WHERE hold_bill_no = ?");
+            if ($bill['status'] !== 'PENDING') {
+                throw new Exception("Only PENDING bills can be cancelled. Current status: {$bill['status']}.");
+            }
+
+            // Mark as CANCELLED
+            $upd_stmt = $pdo->prepare("
+                UPDATE pending_sales 
+                SET status = 'CANCELLED', cancelled_at = NOW(), updated_at = NOW() 
+                WHERE hold_bill_no = ?
+            ");
             $upd_stmt->execute([$hold_bill_no]);
 
-            // Add Audit Trail Log: Bill Cancelled
+            // Audit Trail Log
             $log_stmt = $pdo->prepare("
                 INSERT INTO pending_sales_logs (user_id, username, action, log_date, log_time, bill_no) 
                 VALUES (?, ?, 'Bill Cancelled', CURDATE(), CURTIME(), ?)
@@ -308,14 +362,17 @@ switch ($action) {
 
             echo json_encode([
                 'success' => true,
-                'message' => 'Pending bill cancelled successfully.'
+                'message' => "Hold bill {$hold_bill_no} cancelled successfully."
             ]);
+
         } catch (Exception $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log("[POS][pending_sales_api][cancel] ERROR: " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
         break;
 
+    // ─────────────────────────────────────────────────────────────────────
     default:
         echo json_encode(['success' => false, 'message' => 'Invalid action specifier.']);
         break;
