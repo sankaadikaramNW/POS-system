@@ -122,6 +122,34 @@ require_once 'includes/header.php';
     </div>
 </div>
 
+<!-- Cancel Pending Bill Confirmation Modal -->
+<div class="modal fade" id="pbCancelConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content" style="border-radius: 16px; overflow: hidden; border: none; box-shadow: 0 12px 40px rgba(239,68,68,0.18);">
+            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                <div class="text-center w-100">
+                    <div style="width:56px; height:56px; border-radius:50%; background:rgba(239,68,68,0.1); display:inline-flex; align-items:center; justify-content:center; margin-bottom:12px;">
+                        <i class="fas fa-ban text-danger" style="font-size:1.5rem;"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-dark">Cancel Hold Bill?</h5>
+                </div>
+            </div>
+            <div class="modal-body text-center px-4 pt-2 pb-1">
+                <p class="text-muted small mb-1">Hold Bill: <strong id="pbCancelBillNo">—</strong></p>
+                <p class="text-muted small mb-0">This bill will be permanently cancelled and logged in the audit trail. This cannot be undone.</p>
+            </div>
+            <div class="modal-footer border-0 d-flex gap-2 px-4 pb-4 pt-3">
+                <button type="button" class="btn btn-outline-secondary flex-grow-1 py-2 fw-semibold" data-bs-dismiss="modal" style="border-radius:10px;">
+                    <i class="fas fa-arrow-left me-1"></i> Keep Bill
+                </button>
+                <button type="button" class="btn btn-danger flex-grow-1 py-2 fw-bold" id="btnConfirmPBCancel" style="border-radius:10px;">
+                    <i class="fas fa-ban me-1"></i> Yes, Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 let currentPage = 1;
 const recordsPerPage = 10;
@@ -430,28 +458,60 @@ function viewDetails(holdBillNo) {
     });
 }
 
-function cancelPendingSale(holdBillNo) {
-    if (!confirm(`Are you sure you want to permanently cancel and discard Hold Bill ${holdBillNo}?\nThis action will record a status change to CANCELLED in the database and write to the audit trail.`)) return;
+// ── Cancel Pending Sale ───────────────────────────────────────────────────
+let _pbCancelInProgress = false; // idempotency guard
 
-    $.ajax({
-        type: 'GET',
-        url: 'api/pending_sales_api.php',
-        data: { action: 'cancel', hold_bill_no: holdBillNo },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                alert(`Hold Bill ${holdBillNo} cancelled successfully.`);
-                loadPendingQueue(currentPage);
-            } else {
-                alert("Failed to cancel: " + response.message);
+function cancelPendingSale(holdBillNo) {
+    if (_pbCancelInProgress) return;
+
+    // Populate modal details
+    $('#pbCancelBillNo').text(holdBillNo);
+
+    // Wire confirm button fresh each time
+    $('#btnConfirmPBCancel').off('click').on('click', function() {
+        if (_pbCancelInProgress) return;
+        _pbCancelInProgress = true;
+
+        const $btn = $(this);
+        $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Cancelling...');
+
+        // Hide both modals (details + confirm) before proceeding
+        ['pbCancelConfirmModal', 'detailsModal'].forEach(function(id) {
+            const el = document.getElementById(id);
+            const inst = bootstrap.Modal.getInstance(el);
+            if (inst) inst.hide();
+        });
+
+        $.ajax({
+            type: 'POST',
+            url: 'api/pending_sales_api.php',
+            data: { action: 'cancel', hold_bill_no: holdBillNo },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    showPBToast('Hold Bill ' + holdBillNo + ' cancelled successfully.', 'success');
+                    loadPendingQueue(currentPage);
+                } else {
+                    showPBToast('Failed to cancel: ' + response.message, 'danger');
+                }
+            },
+            error: function(xhr, status, error) {
+                showPBToast('Network error while cancelling: ' + error, 'danger');
+            },
+            complete: function() {
+                _pbCancelInProgress = false;
+                $btn.prop('disabled', false).html('<i class="fas fa-ban me-1"></i> Yes, Cancel');
             }
-        },
-        error: function() {
-            alert("Error communicating cancellation payload to API.");
-        }
+        });
     });
+
+    // Show confirmation modal
+    const confirmEl   = document.getElementById('pbCancelConfirmModal');
+    const confirmInst = bootstrap.Modal.getInstance(confirmEl) || new bootstrap.Modal(confirmEl);
+    confirmInst.show();
 }
 
+// ── escapeHtml helper ──────────────────────────────────────────────────
 function escapeHtml(text) {
     if (!text) return '';
     return text
@@ -460,6 +520,35 @@ function escapeHtml(text) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+// ── Toast helper ─────────────────────────────────────────────────────
+function showPBToast(message, type = 'success') {
+    const toastId = 'pbToast_' + Date.now();
+    const bgClass = type === 'success' ? 'bg-success' :
+                    type === 'warning' ? 'bg-warning text-dark' :
+                    type === 'danger'  ? 'bg-danger' : 'bg-primary';
+    const icon    = type === 'success' ? 'fa-check-circle' :
+                    type === 'warning' ? 'fa-exclamation-triangle' :
+                    type === 'danger'  ? 'fa-times-circle' : 'fa-info-circle';
+
+    const toastHtml = `
+        <div id="${toastId}" class="toast align-items-center text-white border-0 ${bgClass}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="4500">
+            <div class="d-flex">
+                <div class="toast-body fw-semibold" style="font-size:0.88rem;">
+                    <i class="fas ${icon} me-2"></i>${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>`;
+
+    if (!$('#pbToastContainer').length) {
+        $('body').append('<div id="pbToastContainer" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:9999;"></div>');
+    }
+    $('#pbToastContainer').append(toastHtml);
+    const toastEl = document.getElementById(toastId);
+    new bootstrap.Toast(toastEl).show();
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
 }
 </script>
 

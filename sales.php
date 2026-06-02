@@ -310,6 +310,63 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
     </div>
 </div>
 
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     POS Cancel Transaction Confirmation Modal
+     â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<div class="modal fade" id="posCancelConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="posCancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content" style="border-radius: 16px; overflow: hidden; border: none; box-shadow: 0 12px 40px rgba(239,68,68,0.18);">
+            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                <div class="text-center w-100">
+                    <div style="width:56px; height:56px; border-radius:50%; background:rgba(239,68,68,0.1); display:inline-flex; align-items:center; justify-content:center; margin-bottom:12px;">
+                        <i class="fas fa-exclamation-triangle text-danger" style="font-size:1.5rem;"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-dark" id="posCancelModalLabel">Cancel Transaction?</h5>
+                </div>
+            </div>
+            <div class="modal-body text-center px-4 pt-2 pb-1">
+                <p class="text-muted small mb-0" id="cancelModalSubtext">All items in the current cart will be removed.</p>
+            </div>
+            <div class="modal-footer border-0 d-flex gap-2 px-4 pb-4 pt-3">
+                <button type="button" class="btn btn-outline-secondary flex-grow-1 py-2 fw-semibold" data-bs-dismiss="modal" style="border-radius:10px;">
+                    <i class="fas fa-arrow-left me-1"></i> Keep Sale
+                </button>
+                <button type="button" class="btn btn-danger flex-grow-1 py-2 fw-bold" id="btnConfirmCancelPOS" onclick="confirmCancelPOSTransaction()" style="border-radius:10px;">
+                    <i class="fas fa-trash-alt me-1"></i> Yes, Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     Held Bill Discard Confirmation Modal
+     â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<div class="modal fade" id="heldBillDiscardModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content" style="border-radius: 16px; overflow: hidden; border: none; box-shadow: 0 12px 40px rgba(239,68,68,0.18);">
+            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                <div class="text-center w-100">
+                    <div style="width:56px; height:56px; border-radius:50%; background:rgba(239,68,68,0.1); display:inline-flex; align-items:center; justify-content:center; margin-bottom:12px;">
+                        <i class="fas fa-ban text-danger" style="font-size:1.5rem;"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-dark">Discard Held Bill?</h5>
+                </div>
+            </div>
+            <div class="modal-body text-center px-4 pt-2 pb-1">
+                <p class="text-muted small mb-0">Hold bill <strong id="heldBillDiscardNo">â€”</strong> will be permanently cancelled and logged in the audit trail.</p>
+            </div>
+            <div class="modal-footer border-0 d-flex gap-2 px-4 pb-4 pt-3">
+                <button type="button" class="btn btn-outline-secondary flex-grow-1 py-2 fw-semibold" data-bs-dismiss="modal" style="border-radius:10px;">
+                    <i class="fas fa-times me-1"></i> Keep Bill
+                </button>
+                <button type="button" class="btn btn-danger flex-grow-1 py-2 fw-bold" id="btnConfirmDiscardHeld" style="border-radius:10px;">
+                    <i class="fas fa-trash-alt me-1"></i> Yes, Discard
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- Print utility container (invisible on screen, only prints) -->
 <div id="printContainer" class="print-only"></div>
 
@@ -1276,4 +1333,5 @@ function showPOSToast(message, type = 'success') {
 </script>
 
 <?php require_once 'includes/footer.php'; ?>
+
 
