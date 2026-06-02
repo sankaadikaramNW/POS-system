@@ -3,12 +3,12 @@ require_once 'config/database.php';
 require_once 'includes/header.php';
 
 // Get today's sales
-$stmt = $pdo->prepare("SELECT COALESCE(SUM(total_amount), 0) as today_sales FROM sales WHERE DATE(sale_date) = CURDATE()");
+$stmt = $pdo->prepare("SELECT COALESCE(SUM(total_amount), 0) as today_sales FROM sales WHERE DATE(sale_date) = CURDATE() AND status != 'CANCELLED'");
 $stmt->execute();
 $today_sales = $stmt->fetch()['today_sales'];
 
 // Get monthly sales
-$stmt = $pdo->prepare("SELECT COALESCE(SUM(total_amount), 0) as monthly_sales FROM sales WHERE MONTH(sale_date) = MONTH(CURDATE()) AND YEAR(sale_date) = YEAR(CURDATE())");
+$stmt = $pdo->prepare("SELECT COALESCE(SUM(total_amount), 0) as monthly_sales FROM sales WHERE MONTH(sale_date) = MONTH(CURDATE()) AND YEAR(sale_date) = YEAR(CURDATE()) AND status != 'CANCELLED'");
 $stmt->execute();
 $monthly_sales = $stmt->fetch()['monthly_sales'];
 
@@ -16,15 +16,32 @@ $monthly_sales = $stmt->fetch()['monthly_sales'];
 $stmt = $pdo->query("SELECT COUNT(*) as total_products FROM products");
 $total_products = $stmt->fetch()['total_products'];
 
+// Total Stock Units (sum of all stock_quantity in products table)
+$stmt = $pdo->query("SELECT COALESCE(SUM(stock_quantity), 0) as total_stock_units FROM products");
+$total_stock_units = $stmt->fetch()['total_stock_units'];
+
+// Out of Stock Count
+$stmt = $pdo->query("SELECT COUNT(*) as out_of_stock FROM products WHERE stock_quantity = 0");
+$out_of_stock_count = $stmt->fetch()['out_of_stock'];
+
+// Low Stock Count
+$stmt = $pdo->query("SELECT COUNT(*) as low_stock_count FROM products WHERE stock_quantity > 0 AND stock_quantity <= reorder_level");
+$low_stock_count = $stmt->fetch()['low_stock_count'];
+
 // Total Customers
 $stmt = $pdo->query("SELECT COUNT(*) as total_customers FROM customers");
 $total_customers = $stmt->fetch()['total_customers'];
 
-// Recent Sales
+// Active Pending Sales
+$stmt = $pdo->query("SELECT COUNT(*) as pending_count FROM pending_sales WHERE status = 'PENDING'");
+$pending_count = $stmt->fetch()['pending_count'];
+
+// Recent Sales (excluding cancelled sales)
 $stmt = $pdo->query("
     SELECT s.id, s.invoice_no, s.total_amount, s.sale_date, c.customer_name 
     FROM sales s 
     LEFT JOIN customers c ON s.customer_id = c.id 
+    WHERE s.status != 'CANCELLED'
     ORDER BY s.id DESC LIMIT 5
 ");
 $recent_sales = $stmt->fetchAll();
@@ -48,14 +65,14 @@ $low_stock = $stmt->fetchAll();
 
 <div class="row g-3 mb-4">
     <!-- Today's Sales -->
-    <div class="col-md-3">
+    <div class="col-xl col-md-6 col-sm-6">
         <a href="reports.php" class="text-decoration-none">
             <div class="card bg-primary text-white h-100 dashboard-tile">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-uppercase mb-2">Today's Sales</h6>
-                            <h3 class="mb-0">LKR <?= number_format($today_sales, 2) ?></h3>
+                            <h6 class="text-uppercase mb-2" style="font-weight:700; font-size:0.75rem; letter-spacing:0.5px;">Today's Sales</h6>
+                            <h3 class="mb-0 fw-bold">LKR <?= number_format($today_sales, 2) ?></h3>
                         </div>
                         <div class="fs-1 opacity-50">
                             <span class="fw-bold fs-3">LKR</span>
@@ -66,14 +83,14 @@ $low_stock = $stmt->fetchAll();
         </a>
     </div>
     <!-- Monthly Sales -->
-    <div class="col-md-3">
+    <div class="col-xl col-md-6 col-sm-6">
         <a href="reports.php" class="text-decoration-none">
             <div class="card bg-success text-white h-100 dashboard-tile">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-uppercase mb-2">Monthly Sales</h6>
-                            <h3 class="mb-0">LKR <?= number_format($monthly_sales, 2) ?></h3>
+                            <h6 class="text-uppercase mb-2" style="font-weight:700; font-size:0.75rem; letter-spacing:0.5px;">Monthly Sales</h6>
+                            <h3 class="mb-0 fw-bold">LKR <?= number_format($monthly_sales, 2) ?></h3>
                         </div>
                         <div class="fs-1 opacity-50">
                             <i class="fas fa-chart-line"></i>
@@ -84,14 +101,14 @@ $low_stock = $stmt->fetchAll();
         </a>
     </div>
     <!-- Total Products -->
-    <div class="col-md-3">
+    <div class="col-xl col-md-6 col-sm-6">
         <a href="products.php" class="text-decoration-none">
             <div class="card bg-info text-white h-100 dashboard-tile">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-uppercase mb-2">Total Products</h6>
-                            <h3 class="mb-0"><?= number_format($total_products) ?></h3>
+                            <h6 class="text-uppercase mb-2" style="font-weight:700; font-size:0.75rem; letter-spacing:0.5px;">Total Products</h6>
+                            <h3 class="mb-0 fw-bold"><?= number_format($total_products) ?></h3>
                         </div>
                         <div class="fs-1 opacity-50">
                             <i class="fas fa-box-open"></i>
@@ -102,17 +119,93 @@ $low_stock = $stmt->fetchAll();
         </a>
     </div>
     <!-- Total Customers -->
-    <div class="col-md-3">
+    <div class="col-xl col-md-6 col-sm-6">
         <a href="customers.php" class="text-decoration-none">
-            <div class="card bg-warning text-dark h-100 dashboard-tile">
+            <div class="card bg-dark text-white h-100 dashboard-tile" style="background:#4b5563 !important;">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-uppercase mb-2">Total Customers</h6>
-                            <h3 class="mb-0"><?= number_format($total_customers) ?></h3>
+                            <h6 class="text-uppercase mb-2" style="font-weight:700; font-size:0.75rem; letter-spacing:0.5px;">Total Customers</h6>
+                            <h3 class="mb-0 fw-bold"><?= number_format($total_customers) ?></h3>
                         </div>
                         <div class="fs-1 opacity-50">
                             <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Pending Holds -->
+    <div class="col-xl col-md-6 col-sm-6">
+        <a href="pending_bills.php" class="text-decoration-none">
+            <div class="card h-100 dashboard-tile <?= $pending_count > 0 ? 'pulse-held-active' : '' ?>" style="background: linear-gradient(135deg, #fef3c7, #fde68a) !important; border: 1px solid #f59e0b !important; color: #92400e !important; box-shadow: <?= $pending_count > 0 ? '0 0 15px rgba(245, 158, 11, 0.4)' : 'none' ?>;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-2" style="font-weight:700; font-size:0.75rem; letter-spacing:0.5px;">Pending Holds</h6>
+                            <h3 class="mb-0 fw-bold"><?= number_format($pending_count) ?></h3>
+                        </div>
+                        <div class="fs-1 opacity-70">
+                            <i class="fas fa-hourglass-half text-warning animate-pulse"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Second Row: Inventory KPIs (DB-driven) -->
+<div class="row g-3 mb-4">
+    <!-- Total Stock Units -->
+    <div class="col-xl col-md-4 col-sm-6">
+        <a href="inventory.php" class="text-decoration-none">
+            <div class="card text-white h-100 dashboard-tile" style="background: linear-gradient(135deg, #0ea5e9, #0369a1) !important;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-2" style="font-weight:700; font-size:0.75rem; letter-spacing:0.5px;">Total Stock Units</h6>
+                            <h3 class="mb-0 fw-bold"><?= number_format($total_stock_units) ?></h3>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <i class="fas fa-cubes"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Low Stock Items -->
+    <div class="col-xl col-md-4 col-sm-6">
+        <a href="inventory.php" class="text-decoration-none">
+            <div class="card text-white h-100 dashboard-tile" style="background: linear-gradient(135deg, #f59e0b, #b45309) !important;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-2" style="font-weight:700; font-size:0.75rem; letter-spacing:0.5px;">Low Stock Items</h6>
+                            <h3 class="mb-0 fw-bold"><?= number_format($low_stock_count) ?></h3>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Out of Stock -->
+    <div class="col-xl col-md-4 col-sm-6">
+        <a href="inventory.php" class="text-decoration-none">
+            <div class="card text-white h-100 dashboard-tile <?= $out_of_stock_count > 0 ? 'pulse-held-active' : '' ?>" style="background: linear-gradient(135deg, #ef4444, #991b1b) !important; <?= $out_of_stock_count > 0 ? 'box-shadow: 0 0 15px rgba(239,68,68,0.4);' : '' ?>">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-2" style="font-weight:700; font-size:0.75rem; letter-spacing:0.5px;">Out of Stock</h6>
+                            <h3 class="mb-0 fw-bold"><?= number_format($out_of_stock_count) ?></h3>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <i class="fas fa-times-circle"></i>
                         </div>
                     </div>
                 </div>
@@ -269,6 +362,27 @@ function viewSaleDetail(invoiceNo) {
                 `;
             }
 
+            let stampHtml = '';
+            let cancelBtnHtml = '';
+            if (s.status === 'CANCELLED') {
+                stampHtml = `
+                    <div class="text-center mt-3" style="border: 4px double #dc3545; padding: 8px; border-radius: 8px; position: relative; z-index: 5;">
+                        <span style="color: #dc3545; font-weight: 900; font-size: 1.4rem; letter-spacing: 3px;">✗ CANCELLED</span>
+                    </div>
+                `;
+            } else {
+                stampHtml = `
+                    <div class="text-center mt-3" style="border: 4px double #10b981; padding: 8px; border-radius: 8px; position: relative; z-index: 5;">
+                        <span style="color: #10b981; font-weight: 900; font-size: 1.4rem; letter-spacing: 3px;">✓ PAID</span>
+                    </div>
+                `;
+                cancelBtnHtml = `
+                    <button type="button" class="btn btn-danger w-100 mt-3 fw-bold no-print-btn" onclick="confirmCancelSale('${s.invoice_no}')" style="position: relative; z-index: 10;">
+                        <i class="fas fa-ban me-1"></i> Cancel Transaction (DB-Sync)
+                    </button>
+                `;
+            }
+
             let receiptHtml = `
                 <div class="thermal-receipt-preview" id="saleDetailReceipt" style="max-width: 100%; box-shadow: none; border: none; position: relative; overflow: hidden; padding: 10px;">
                     ${watermarkHtml}
@@ -318,9 +432,8 @@ function viewSaleDetail(invoiceNo) {
                             <tr><td>Change:</td><td style="text-align: right;">LKR ${parseFloat(s.balance).toFixed(2)}</td></tr>
                         </table>
                         <div class="dashed-line"></div>
-                        <div class="text-center mt-3" style="border: 4px double #10b981; padding: 8px; border-radius: 8px;">
-                            <span style="color: #10b981; font-weight: 900; font-size: 1.4rem; letter-spacing: 3px;">✓ PAID</span>
-                        </div>
+                        ${stampHtml}
+                        ${cancelBtnHtml}
                     </div>
                 </div>
             `;
@@ -389,10 +502,47 @@ function executePrint() {
                 // Refresh modal to reflect incremented count and watermark
                 viewSaleDetail(currentInvoiceNo);
             }, 1000);
-        } else {
-            alert("Failed to track print: " + res.message);
         }
     }, 'json');
+}
+
+function confirmCancelSale(invoiceNo) {
+    if (!confirm("Are you sure you want to cancel transaction " + invoiceNo + "?\nThis action will update invoice status to CANCELLED, automatically restore all sold quantities back to inventory stock, and log this cancellation in the database.")) {
+        return;
+    }
+    
+    let reason = prompt("Please enter the reason for cancellation:");
+    if (reason === null) return;
+    reason = reason.trim();
+    if (!reason) {
+        alert("Cancellation reason is required!");
+        return;
+    }
+    
+    // Call backend API
+    $.ajax({
+        type: 'POST',
+        url: 'api/cancel_sale.php',
+        data: {
+            invoice_no: invoiceNo,
+            reason: reason
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                alert(response.message);
+                const detailModalEl = document.getElementById('saleDetailModal');
+                const detailModal = bootstrap.Modal.getInstance(detailModalEl);
+                if (detailModal) detailModal.hide();
+                window.location.reload();
+            } else {
+                alert("Failed to cancel transaction: " + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert("Error communicating with cancellation endpoint: " + error);
+        }
+    });
 }
 </script>
 

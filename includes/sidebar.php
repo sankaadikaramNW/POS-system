@@ -21,6 +21,22 @@ $role = $_SESSION['role'] ?? 'cashier';
         <li class="<?= $current_page == 'sales.php' ? 'active' : '' ?>">
             <a href="sales.php"><i class="fas fa-shopping-cart"></i> POS / Sales</a>
         </li>
+        <li class="<?= $current_page == 'pending_bills.php' ? 'active' : '' ?>">
+            <a href="pending_bills.php" class="d-flex align-items-center justify-content-between">
+                <span><i class="fas fa-hourglass-half text-warning"></i> Pending Bills</span>
+                <?php
+                $sidebar_pending_count = 0;
+                if (isset($pdo)) {
+                    try {
+                        $sidebar_pending_count = $pdo->query("SELECT COUNT(*) FROM pending_sales WHERE status = 'PENDING'")->fetchColumn();
+                    } catch (Exception $e) {}
+                }
+                if ($sidebar_pending_count > 0):
+                ?>
+                    <span class="badge bg-warning text-dark fw-bold px-2 py-1 rounded" style="font-size: 0.72rem; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);"><?= $sidebar_pending_count ?></span>
+                <?php endif; ?>
+            </a>
+        </li>
         <li class="<?= $current_page == 'products.php' ? 'active' : '' ?>">
             <a href="products.php"><i class="fas fa-box"></i> Products</a>
         </li>

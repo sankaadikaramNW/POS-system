@@ -55,13 +55,15 @@ $stmt->execute($params);
 $sales = $stmt->fetchAll();
 
 // ── Summary totals ─────────────────────────────────────────
-$total_amount   = array_sum(array_column($sales,'total_amount'));
-$total_invoices = count($sales);
+$active_sales   = array_filter($sales, function($s) { return $s['status'] !== 'CANCELLED'; });
+$total_amount   = array_sum(array_column($active_sales,'total_amount'));
+$total_invoices = count($active_sales);
 $avg_order      = $total_invoices > 0 ? $total_amount / $total_invoices : 0;
 
 // ── Payment breakdown ──────────────────────────────────────
 $pay_breakdown = [];
 foreach ($sales as $s) {
+    if ($s['status'] === 'CANCELLED') continue;
     $pm = $s['payment_method'];
     $pay_breakdown[$pm] = ($pay_breakdown[$pm] ?? 0) + $s['total_amount'];
 }
@@ -271,11 +273,11 @@ foreach ($sales as $s) {
                     <th>Date &amp; Time</th>
                     <th>Customer</th>
                     <th>Cashier</th>
-                    <th>Payment</th>
+                    <th>Status &amp; Payment</th>
                     <th class="text-end">Subtotal</th>
                     <th class="text-end">Discount</th>
                     <th class="text-end">Total</th>
-                    <th class="text-center no-print-btn">Detail</th>
+                    <th class="text-center no-print-btn">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -297,14 +299,28 @@ foreach ($sales as $s) {
                 </td>
                 <td><?= htmlspecialchars($s['customer_name']) ?></td>
                 <td style="font-size:.83rem;"><?= htmlspecialchars($s['cashier_name']) ?></td>
-                <td><span class="badge-payment badge-<?= $pm_badge ?>"><?= htmlspecialchars($s['payment_method']) ?></span></td>
+                <td>
+                    <span class="badge-payment badge-<?= $pm_badge ?>"><?= htmlspecialchars($s['payment_method']) ?></span>
+                    <?php if ($s['status'] === 'CANCELLED'): ?>
+                        <span class="badge bg-danger ms-1" style="font-size:.72rem; font-weight:700;">CANCELLED</span>
+                    <?php else: ?>
+                        <span class="badge bg-success ms-1" style="font-size:.72rem; font-weight:700;">COMPLETED</span>
+                    <?php endif; ?>
+                </td>
                 <td class="text-end">LKR <?= number_format($s['total_amount'] + $s['discount'], 2) ?></td>
                 <td class="text-end text-danger">-LKR <?= number_format($s['discount'],2) ?></td>
-                <td class="text-end fw-bold" style="color:#1e293b;">LKR <?= number_format($s['total_amount'],2) ?></td>
+                <td class="text-end fw-bold" style="color:#1e293b; <?= $s['status'] === 'CANCELLED' ? 'text-decoration: line-through; opacity: 0.6;' : '' ?>">LKR <?= number_format($s['total_amount'],2) ?></td>
                 <td class="text-center no-print-btn">
-                    <button class="btn btn-sm btn-dark-premium text-info border-0" onclick="viewDetail('<?= htmlspecialchars($s['invoice_no'], ENT_QUOTES) ?>')" title="View Items">
-                        <i class="fas fa-eye"></i>
-                    </button>
+                    <div class="d-inline-flex gap-2">
+                        <button class="btn btn-sm btn-dark-premium text-info border-0" onclick="viewDetail('<?= htmlspecialchars($s['invoice_no'], ENT_QUOTES) ?>')" title="View Items">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <?php if ($s['status'] !== 'CANCELLED'): ?>
+                        <button class="btn btn-sm btn-dark-premium text-danger border-0" onclick="confirmCancelSale('<?= htmlspecialchars($s['invoice_no'], ENT_QUOTES) ?>')" title="Cancel Sale">
+                            <i class="fas fa-ban"></i>
+                        </button>
+                        <?php endif; ?>
+                    </div>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -426,6 +442,28 @@ function viewDetail(invoiceNo) {
                     <td class="text-end" style="color:#1e293b;">LKR ${parseFloat(i.selling_price).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
                     <td class="text-end fw-bold" style="color:#1e293b;">LKR ${parseFloat(i.subtotal).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
                 </tr>`).join('');
+            
+            let stampHtml = '';
+            let cancelBtnHtml = '';
+            if (s.status === 'CANCELLED') {
+                stampHtml = `
+                    <div class="text-center mt-3" style="border: 3px double #dc3545; padding: 6px; border-radius: 8px; max-width: 200px; margin-left: auto;">
+                        <span style="color: #dc3545; font-weight: 900; font-size: 1.1rem; letter-spacing: 2px;">✗ CANCELLED</span>
+                    </div>
+                `;
+            } else {
+                stampHtml = `
+                    <div class="text-center mt-3" style="border: 3px double #10b981; padding: 6px; border-radius: 8px; max-width: 200px; margin-left: auto;">
+                        <span style="color: #10b981; font-weight: 900; font-size: 1.1rem; letter-spacing: 2px;">✓ PAID</span>
+                    </div>
+                `;
+                cancelBtnHtml = `
+                    <button class="btn btn-danger w-100 mt-3 fw-bold no-print-btn" onclick="confirmCancelSale('${s.invoice_no}')">
+                        <i class="fas fa-ban me-1"></i> Cancel Transaction (DB-Sync)
+                    </button>
+                `;
+            }
+
             document.getElementById('detailBody').innerHTML = `
                 <div class="p-4">
                     <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
@@ -451,11 +489,55 @@ function viewDetail(invoiceNo) {
                         <div style="color:#dc2626;">Discount: <strong>-LKR ${parseFloat(s.discount).toLocaleString('en-US',{minimumFractionDigits:2})}</strong></div>
                         <div class="fw-bold" style="font-size:1.1rem;color:#1e293b;">Total: LKR ${parseFloat(s.total_amount).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
                         <div style="color:#64748b;">Paid: LKR ${parseFloat(s.paid_amount).toLocaleString('en-US',{minimumFractionDigits:2})} &nbsp;|&nbsp; Balance: LKR ${parseFloat(s.balance).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
-                        <span class="badge mt-1" style="background:rgba(16,163,74,.12);color:#16a34a;">${s.payment_method}</span>
+                        <div class="d-flex gap-2 align-items-center mt-1">
+                            <span class="badge" style="background:rgba(16,163,74,.12);color:#16a34a;">${s.payment_method}</span>
+                            <span class="badge ${s.status === 'CANCELLED' ? 'bg-danger' : 'bg-success'}">${s.status}</span>
+                        </div>
                     </div>
+                    ${stampHtml}
+                    ${cancelBtnHtml}
                 </div>`;
         })
         .catch(() => { document.getElementById('detailBody').innerHTML = '<p class="text-danger p-4">Error loading detail.</p>'; });
+}
+
+function confirmCancelSale(invoiceNo) {
+    if (!confirm("Are you sure you want to cancel transaction " + invoiceNo + "?\nThis action will update invoice status to CANCELLED, automatically restore all sold quantities back to inventory stock, and log this cancellation in the database.")) {
+        return;
+    }
+    
+    let reason = prompt("Please enter the reason for cancellation:");
+    if (reason === null) return;
+    reason = reason.trim();
+    if (!reason) {
+        alert("Cancellation reason is required!");
+        return;
+    }
+    
+    // Call backend API
+    $.ajax({
+        type: 'POST',
+        url: 'api/cancel_sale.php',
+        data: {
+            invoice_no: invoiceNo,
+            reason: reason
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                alert(response.message);
+                const detailModalEl = document.getElementById('detailModal');
+                const detailModal = bootstrap.Modal.getInstance(detailModalEl);
+                if (detailModal) detailModal.hide();
+                window.location.reload();
+            } else {
+                alert("Failed to cancel transaction: " + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert("Error communicating with cancellation endpoint: " + error);
+        }
+    });
 }
 </script>
 

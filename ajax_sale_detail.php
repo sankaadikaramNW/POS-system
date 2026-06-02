@@ -62,7 +62,8 @@ echo json_encode([
         'total_amount' => (float)$sale['total_amount'],
         'paid_amount' => (float)$sale['paid_amount'],
         'balance' => abs((float)$sale['balance']),
-        'payment_method' => $sale['payment_method']
+        'payment_method' => $sale['payment_method'],
+        'status' => $sale['status']
     ],
     'items' => $items
 ]);

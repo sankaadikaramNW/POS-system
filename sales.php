@@ -1,5 +1,41 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once 'config/database.php';
+
+// Handle Resuming Pending Sale
+$resumed_bill = null;
+if (isset($_GET['resume'])) {
+    $resume_no = $_GET['resume'];
+    try {
+        $pdo->beginTransaction();
+        // Prevent completed or cancelled bills from being resumed
+        $stmt = $pdo->prepare("SELECT * FROM pending_sales WHERE hold_bill_no = ? AND status = 'PENDING'");
+        $stmt->execute([$resume_no]);
+        $resumed_bill = $stmt->fetch();
+        
+        if ($resumed_bill) {
+            // Update resumed_at and updated_at
+            $upd = $pdo->prepare("UPDATE pending_sales SET resumed_at = NOW(), updated_at = NOW() WHERE hold_bill_no = ?");
+            $upd->execute([$resume_no]);
+
+            // Add Audit Trail Log: Bill Resumed
+            $user_id = $_SESSION['user_id'] ?? null;
+            $username = $_SESSION['username'] ?? 'unknown';
+            
+            $log = $pdo->prepare("INSERT INTO pending_sales_logs (user_id, username, action, log_date, log_time, bill_no) VALUES (?, ?, 'Bill Resumed', CURDATE(), CURTIME(), ?)");
+            $log->execute([$user_id, $username, $resume_no]);
+            
+            $pdo->commit();
+        } else {
+            $pdo->rollBack();
+        }
+    } catch (Exception $e) {
+        $pdo->rollBack();
+    }
+}
+
 require_once 'includes/header.php';
 
 $customers = $pdo->query("SELECT id, customer_name, phone FROM customers ORDER BY customer_name")->fetchAll();
@@ -48,7 +84,12 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
             <div class="card pos-cart-card border-0" style="border: 1px solid var(--border-color-dark) !important;">
                 <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-2" style="flex-shrink:0;">
                     <h6 class="m-0 fw-bold text-dark"><i class="fas fa-shopping-cart text-primary me-2"></i> Current Sale</h6>
-                    <span class="badge bg-dark-premium text-white px-2 py-1 border" style="border-color: var(--border-color-dark) !important; font-size:0.75rem;" id="cartCount">0 Items</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-dark-premium py-1 px-2 border" id="btnHeldBills" onclick="openHeldBillsModal()" style="font-size:0.75rem; border-color: var(--border-color-dark) !important; display: inline-flex; align-items: center;">
+                            <i class="fas fa-hourglass-half me-1"></i> Held Bills (<span id="heldBillsCount">0</span>)
+                        </button>
+                        <span class="badge bg-dark-premium text-white px-2 py-1 border" style="border-color: var(--border-color-dark) !important; font-size:0.75rem;" id="cartCount">0 Items</span>
+                    </div>
                 </div>
                 
                 <div class="card-body">
@@ -62,6 +103,12 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                                 <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['customer_name']) ?> (<?= htmlspecialchars($c['phone']) ?>)</option>
                             <?php endforeach; ?>
                         </select>
+                    </div>
+
+                    <!-- Sale Notes / Reference -->
+                    <div class="mb-2" style="flex-shrink:0;">
+                        <label class="text-muted fw-semibold mb-1" style="font-size:0.72rem;">Sale Notes / Reference</label>
+                        <input type="text" id="saleNotes" class="form-control form-control-sm" placeholder="Add note or reference..." style="height:32px; font-size:0.8rem;">
                     </div>
 
                     <!-- Cart Item Table (Scrollable) -->
@@ -111,6 +158,7 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                         
                         <!-- Form submitted via AJAX -->
                         <form id="checkoutForm" onsubmit="submitCheckout(event)">
+                            <input type="hidden" name="resumed_hold_bill_no" id="resumedHoldBillNo" value="">
                             <div class="row g-2 mb-2">
                                 <div class="col-6">
                                     <label class="text-muted mb-1" style="font-size: 0.7rem;">Payment Method</label>
@@ -127,10 +175,13 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
                             </div>
                             
                             <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-dark-premium w-50 py-1 fw-bold text-uppercase" onclick="clearCart()" style="font-size:0.8rem;">
+                                <button type="button" class="btn btn-dark-premium py-1 fw-bold text-uppercase" onclick="clearCart()" style="font-size:0.8rem; width: 25%;">
                                     <i class="fas fa-trash-alt me-1"></i> Cancel
                                 </button>
-                                <button type="submit" class="btn btn-orange-premium flex-grow-1 py-1 fw-bold text-uppercase" style="font-size:0.8rem;">
+                                <button type="button" class="btn btn-hold-premium py-1 fw-bold text-uppercase" onclick="holdCurrentBill()" style="font-size:0.8rem; width: 35%;">
+                                    <i class="fas fa-pause-circle me-1"></i> Hold
+                                </button>
+                                <button type="submit" class="btn btn-orange-premium py-1 fw-bold text-uppercase" style="font-size:0.8rem; width: 40%;">
                                     <i class="fas fa-check-circle me-1"></i> Pay & Checkout
                                 </button>
                             </div>
@@ -239,6 +290,26 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY category_name")->fe
     </div>
 </div>
 
+<!-- Premium Held Bills Modal -->
+<div class="modal fade" id="heldBillsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content glass-receipt-modal" style="border-radius: 16px; overflow: hidden; border: none; box-shadow: 0 10px 40px rgba(15, 23, 42, 0.15) !important; background: #ffffff !important;">
+            <div class="modal-header border-0 bg-primary text-white py-3 d-flex align-items-center justify-content-between">
+                <h5 class="modal-title fw-bold m-0 text-white"><i class="fas fa-hourglass-half me-2"></i> Held / Pending Bills</h5>
+                <button type="button" class="btn-close btn-close-white m-0" data-bs-dismiss="modal" aria-label="Close" style="filter: brightness(0) invert(1); opacity: 0.8;"></button>
+            </div>
+            <div class="modal-body p-4" style="max-height: 65vh; overflow-y: auto;">
+                <div id="heldBillsListContainer">
+                    <!-- Dynamic Held Bills List Table Injected Here -->
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 d-flex gap-2">
+                <button type="button" class="btn btn-dark-premium px-3 w-100" data-bs-dismiss="modal"><i class="fas fa-times me-2"></i> Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Print utility container (invisible on screen, only prints) -->
 <div id="printContainer" class="print-only"></div>
 
@@ -286,7 +357,7 @@ function selectCategory(catId, element) {
 }
 
 function addToCart(id, name, price, maxStock) {
-    let existing = cart.find(i => i.id === id);
+    let existing = cart.find(i => Number(i.id) === Number(id));
     if(existing) {
         if(existing.qty < maxStock) {
             existing.qty++;
@@ -304,13 +375,13 @@ function addToCart(id, name, price, maxStock) {
 }
 
 function updateQty(id, change) {
-    let item = cart.find(i => i.id === id);
+    let item = cart.find(i => Number(i.id) === Number(id));
     if(item) {
         let newQty = item.qty + change;
         if(newQty > 0 && newQty <= item.maxStock) {
             item.qty = newQty;
         } else if(newQty <= 0) {
-            cart = cart.filter(i => i.id !== id);
+            cart = cart.filter(i => Number(i.id) !== Number(id));
         } else {
             alert('Cannot exceed available stock limit!');
         }
@@ -319,7 +390,7 @@ function updateQty(id, change) {
 }
 
 function removeFromCart(id) {
-    cart = cart.filter(i => i.id !== id);
+    cart = cart.filter(i => Number(i.id) !== Number(id));
     renderCart();
 }
 
@@ -344,22 +415,26 @@ function renderCart() {
     }
 
     cart.forEach(item => {
-        let total = item.price * item.qty;
+        // Normalize types -- after a DB recall all values come back as strings
+        let itemId    = Number(item.id);
+        let itemPrice = parseFloat(item.price) || 0;
+        let itemQty   = parseInt(item.qty)     || 1;
+        let total = itemPrice * itemQty;
         subtotal += total;
-        itemCount += item.qty;
+        itemCount += itemQty;
         html += `
         <tr style="border-bottom: 1px solid var(--border-color-dark);">
             <td style="padding: 10px 5px;"><small class="fw-bold text-dark">${item.name}</small></td>
-            <td class="text-muted">Rs. ${item.price.toFixed(2)}</td>
+            <td class="text-muted">Rs. ${itemPrice.toFixed(2)}</td>
             <td class="text-center">
                 <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-sm btn-dark-premium py-0 px-2" onclick="updateQty(${item.id}, -1)">-</button>
-                    <span class="btn btn-sm bg-light text-dark px-2 disabled fw-bold py-0 border" style="border-color: var(--border-color-dark) !important;">${item.qty}</span>
-                    <button type="button" class="btn btn-sm btn-dark-premium py-0 px-2" onclick="updateQty(${item.id}, 1)">+</button>
+                    <button type="button" class="btn btn-sm btn-dark-premium py-0 px-2" onclick="updateQty(${itemId}, -1)">-</button>
+                    <span class="btn btn-sm bg-light text-dark px-2 disabled fw-bold py-0 border" style="border-color: var(--border-color-dark) !important;">${itemQty}</span>
+                    <button type="button" class="btn btn-sm btn-dark-premium py-0 px-2" onclick="updateQty(${itemId}, 1)">+</button>
                 </div>
             </td>
             <td class="text-end fw-semibold text-primary">Rs. ${total.toFixed(2)}</td>
-            <td class="text-center"><button type="button" class="btn btn-sm btn-dark-premium text-danger py-0 px-1 border-0" onclick="removeFromCart(${item.id})"><i class="fas fa-times-circle"></i></button></td>
+            <td class="text-center"><button type="button" class="btn btn-sm btn-dark-premium text-danger py-0 px-1 border-0" onclick="removeFromCart(${itemId})"><i class="fas fa-times-circle"></i></button></td>
         </tr>`;
     });
     
@@ -417,7 +492,8 @@ function submitCheckout(e) {
             discount: discount,
             tax: tax,
             payment_method: paymentMethod,
-            paid_amount: paidAmount
+            paid_amount: paidAmount,
+            resumed_hold_bill_no: $('#resumedHoldBillNo').val()
         },
         dataType: 'json',
         success: function(response) {
@@ -479,6 +555,8 @@ function clearCart() {
         $('#tax').val('0');
         $('#paymentMethod').val('Cash');
         $('#paidAmount').val('');
+        $('#saleNotes').val('');
+        $('#resumedHoldBillNo').val('');
     }
 }
 
@@ -493,6 +571,9 @@ function startNewSale() {
     $('#tax').val('0');
     $('#paymentMethod').val('Cash');
     $('#paidAmount').val('');
+    $('#saleNotes').val('');
+    $('#resumedHoldBillNo').val('');
+    updateHeldCount();
     
     // Hide Receipt modal
     bootstrap.Modal.getInstance(document.getElementById('receiptModal')).hide();
@@ -510,13 +591,547 @@ function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
+const resumedBillData = <?php echo $resumed_bill ? json_encode($resumed_bill) : 'null'; ?>;
+
+/* ==========================================================================
+   HELD/WAITING BILLS JAVASCRIPT ENGINE (DATABASE INTEGRATED)
+   ========================================================================== */
+
+// Update the dynamic counter and pulse animation in the header
+function updateHeldCount() {
+    $.ajax({
+        type: 'GET',
+        url: 'api/pending_sales_api.php',
+        data: { action: 'count' },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                const count = response.count;
+                $('#heldBillsCount').text(count);
+                
+                const btn = $('#btnHeldBills');
+                if (count > 0) {
+                    btn.addClass('pulse-held-active');
+                    btn.removeClass('btn-dark-premium').addClass('btn-warning');
+                    btn.css({
+                        'background-color': '#f59e0b',
+                        'border-color': '#f59e0b',
+                        'color': 'white'
+                    });
+                } else {
+                    btn.removeClass('pulse-held-active btn-warning').addClass('btn-dark-premium');
+                    btn.css({
+                        'background-color': '',
+                        'border-color': '',
+                        'color': ''
+                    });
+                }
+            }
+        }
+    });
+}
+
+// Hold Current Bill
+function holdCurrentBill() {
+    if (cart.length === 0) {
+        alert("Cart is empty! There is no bill to hold.");
+        return;
+    }
+
+    // Get notes / reference
+    let notes = $('#saleNotes').val().trim();
+    if (!notes) {
+        // Generate default reference if empty
+        const customerSelect = document.getElementById('customerId');
+        let customerName = "Walk-in Customer";
+        if (customerSelect && customerSelect.value) {
+            customerName = customerSelect.options[customerSelect.selectedIndex].text.split('(')[0].trim();
+        }
+        const now = new Date();
+        const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        notes = `${customerName} (${timeString})`;
+    }
+
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const discountPercent = parseFloat($('#discount').val()) || 0;
+    const taxPercent = parseFloat($('#tax').val()) || 0;
+    
+    const discountAmount = subtotal * (discountPercent / 100);
+    const afterDiscount = subtotal - discountAmount;
+    const taxAmount = afterDiscount * (taxPercent / 100);
+    const grandTotal = afterDiscount + taxAmount;
+
+    const customerSelect = document.getElementById('customerId');
+    let customerName = "Walk-in Customer";
+    if (customerSelect && customerSelect.value) {
+        customerName = customerSelect.options[customerSelect.selectedIndex].text.split('(')[0].trim();
+    }
+
+    // Save using API
+    $.ajax({
+        type: 'POST',
+        url: 'api/pending_sales_api.php?action=hold',
+        data: {
+            cart_data: JSON.stringify(cart),
+            customer_id: $('#customerId').val(),
+            customer_name: customerName,
+            subtotal: subtotal,
+            discount_amount: discountAmount,
+            tax_amount: taxAmount,
+            grand_total: grandTotal,
+            notes: notes
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                // Reset the POS cart and fields instantly
+                cart = [];
+                renderCart();
+                $('#customerId').val('');
+                $('#discount').val('0');
+                $('#tax').val('0');
+                $('#paymentMethod').val('Cash');
+                $('#paidAmount').val('');
+                $('#saleNotes').val('');
+                $('#resumedHoldBillNo').val('');
+                
+                // Update visual count
+                updateHeldCount();
+                
+                alert("Bill placed on hold successfully!\nHold Bill No: " + response.hold_bill_no);
+            } else {
+                alert("Failed to hold bill: " + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert("Error placing bill on hold: " + error);
+        }
+    });
+}
+
+// Open Held Bills Modal
+function openHeldBillsModal() {
+    // Show Modal Early so loader is seen
+    let heldBillsModalObj = document.getElementById('heldBillsModal');
+    let heldBillsModal = bootstrap.Modal.getInstance(heldBillsModalObj);
+    if (!heldBillsModal) {
+        heldBillsModal = new bootstrap.Modal(heldBillsModalObj);
+    }
+    heldBillsModal.show();
+
+    loadHeldBillsList();
+}
+
+// Reload lists without re-initializing modal triggers
+function loadHeldBillsList() {
+    const container = $('#heldBillsListContainer');
+    container.html(`
+        <div class="text-center py-5 text-muted">
+            <i class="fas fa-spinner fa-spin fs-1 mb-3 text-warning"></i>
+            <p class="small mb-0">Loading held bills from database...</p>
+        </div>
+    `);
+
+    $.ajax({
+        type: 'GET',
+        url: 'api/pending_sales_api.php',
+        data: { action: 'list', limit: 50 }, // Fetch up to 50 active pending sales
+        dataType: 'json',
+        success: function(response) {
+            if (response.success && response.bills && response.bills.length > 0) {
+                let html = `
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle held-bills-table m-0">
+                            <thead>
+                                <tr>
+                                    <th>Hold Bill No</th>
+                                    <th>Customer / Notes</th>
+                                    <th>Time Held</th>
+                                    <th class="text-end">Total Amount</th>
+                                    <th class="text-center" style="width: 170px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                response.bills.forEach(bill => {
+                    let cartData = [];
+                    try {
+                        cartData = JSON.parse(bill.cart_data_json);
+                    } catch(e){}
+                    const itemCount = cartData.reduce((sum, i) => sum + i.qty, 0);
+                    
+                    // Style badge elapsed time
+                    let minutes = parseInt(bill.minutes_elapsed) || 0;
+                    let waitClass = "bg-success";
+                    if (minutes > 30) {
+                        waitClass = "bg-danger";
+                    } else if (minutes > 15) {
+                        waitClass = "bg-warning text-dark";
+                    }
+
+                    // Format creation time nicely
+                    let dateStr = new Date(bill.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    
+                    html += `
+                        <tr>
+                            <td><strong class="text-dark">${bill.hold_bill_no}</strong></td>
+                            <td>
+                                <span class="d-block fw-semibold text-secondary small">${escapeHtml(bill.customer_name)}</span>
+                                <span class="text-muted text-truncate d-inline-block small" style="max-width: 150px;" title="${escapeHtml(bill.notes || '')}">${escapeHtml(bill.notes || 'No notes')}</span>
+                            </td>
+                            <td>
+                                <span class="text-muted small">${dateStr}</span>
+                                <span class="badge ${waitClass} ms-1 small" style="font-size:0.68rem;">${minutes}m ago</span>
+                            </td>
+                            <td class="text-end fw-bold text-primary">Rs. ${parseFloat(bill.grand_total).toFixed(2)}</td>
+                            <td class="text-center">
+                                <div class="d-inline-flex gap-2">
+                                    <button class="btn btn-sm btn-primary py-1 px-2 d-flex align-items-center" onclick="recallHeldBill('${bill.hold_bill_no}')" title="Recall & Checkout">
+                                        <i class="fas fa-folder-open me-1"></i> Recall
+                                    </button>
+                                    <button class="btn btn-sm btn-danger py-1 px-2 d-flex align-items-center" onclick="deleteHeldBill('${bill.hold_bill_no}')" title="Discard Bill">
+                                        <i class="fas fa-trash-alt me-1"></i> Discard
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                container.html(html);
+            } else {
+                container.html(`
+                    <div class="text-center py-5 text-muted held-bills-empty-state">
+                        <i class="fas fa-hourglass-half d-block fs-1 mb-3 opacity-50 text-warning"></i>
+                        <h5 class="fw-bold text-dark mb-1">No Bills on Hold</h5>
+                        <p class="small mb-0">Put active bills on hold when a customer needs to step away.</p>
+                    </div>
+                `);
+            }
+        },
+        error: function() {
+            container.html(`
+                <div class="alert alert-danger m-3 small">
+                    <i class="fas fa-exclamation-triangle me-1"></i> Failed to retrieve held bills.
+                </div>
+            `);
+        }
+    });
+}
+
+// Recall Held Bill
+function recallHeldBill(holdBillNo) {
+    if (cart.length > 0) {
+        const choice = confirm("You currently have items in the active cart. Do you want to put the CURRENT cart on hold first, then recall the selected bill?\n(Click Cancel to overwrite active cart instead.)");
+        
+        if (choice) {
+            // Auto hold current first
+            let notes = $('#saleNotes').val().trim();
+            if (!notes) {
+                const customerSelect = document.getElementById('customerId');
+                let customerName = "Walk-in Customer";
+                if (customerSelect && customerSelect.value) {
+                    customerName = customerSelect.options[customerSelect.selectedIndex].text.split('(')[0].trim();
+                }
+                const now = new Date();
+                const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                notes = `${customerName} - Auto Hold (${timeString})`;
+            }
+
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const discountPercent = parseFloat($('#discount').val()) || 0;
+            const taxPercent = parseFloat($('#tax').val()) || 0;
+            
+            const discountAmount = subtotal * (discountPercent / 100);
+            const afterDiscount = subtotal - discountAmount;
+            const taxAmount = afterDiscount * (taxPercent / 100);
+            const grandTotal = afterDiscount + taxAmount;
+
+            const customerSelect = document.getElementById('customerId');
+            let customerName = "Walk-in Customer";
+            if (customerSelect && customerSelect.value) {
+                customerName = customerSelect.options[customerSelect.selectedIndex].text.split('(')[0].trim();
+            }
+
+            // Sync ajax call to ensure sequential holds
+            $.ajax({
+                type: 'POST',
+                url: 'api/pending_sales_api.php?action=hold',
+                async: false,
+                data: {
+                    cart_data: JSON.stringify(cart),
+                    customer_id: $('#customerId').val(),
+                    customer_name: customerName,
+                    subtotal: subtotal,
+                    discount_amount: discountAmount,
+                    tax_amount: taxAmount,
+                    grand_total: grandTotal,
+                    notes: notes
+                }
+            });
+        }
+    }
+
+    // Call API to resume and get details
+    $.ajax({
+        type: 'GET',
+        url: 'api/pending_sales_api.php',
+        data: { action: 'resume', hold_bill_no: holdBillNo },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                const bill = response.bill;
+                
+                let rawCart = [];
+                try {
+                    rawCart = JSON.parse(bill.cart_data_json);
+                } catch(e) { rawCart = []; }
+
+                // ── Re-validate stock from DB before loading recalled cart ──
+                // This prevents stale maxStock from hold time causing over-sell
+                $.ajax({
+                    type: 'POST',
+                    url: 'api/stock_check.php',
+                    data: { items: JSON.stringify(rawCart.map(i => ({ id: i.id, qty: i.qty }))) },
+                    dataType: 'json',
+                    success: function(stockResp) {
+                        let stockMap = {};
+                        if (stockResp.success && stockResp.items) {
+                            stockResp.items.forEach(s => { stockMap[s.id] = s; });
+                        }
+
+                        let warnings = [];
+                        cart = rawCart.map(i => {
+                            let itemId    = Number(i.id);
+                            let itemQty   = parseInt(i.qty)   || 1;
+                            let itemPrice = parseFloat(i.price) || 0;
+                            let liveStock = stockMap[itemId] ? stockMap[itemId].current_stock : parseInt(i.maxStock) || 999;
+                            let finalQty  = itemQty;
+
+                            if (stockMap[itemId] && !stockMap[itemId].sufficient) {
+                                // Cap qty to available
+                                finalQty = liveStock;
+                                if (finalQty === 0) {
+                                    warnings.push(`⚠ "${escapeHtml(i.name)}" is now OUT OF STOCK (removed from cart).`);
+                                    return null; // Remove from cart
+                                } else {
+                                    warnings.push(`⚠ "${escapeHtml(i.name)}": reduced from ${itemQty} to ${finalQty} (current stock: ${liveStock}).`);
+                                }
+                            }
+
+                            if (!stockMap[itemId] || !stockMap[itemId].product_exists) {
+                                warnings.push(`⚠ "${escapeHtml(i.name)}" no longer exists in the database — removed from cart.`);
+                                return null;
+                            }
+
+                            return {
+                                id:       itemId,
+                                name:     i.name,
+                                price:    itemPrice,
+                                qty:      finalQty,
+                                maxStock: liveStock
+                            };
+                        }).filter(i => i !== null && i.qty > 0);
+
+                        $('#resumedHoldBillNo').val(bill.hold_bill_no);
+                        $('#customerId').val(bill.customer_id || '');
+                        $('#saleNotes').val(bill.notes || '');
+
+                        // Restore discount/tax percentages
+                        let sub = parseFloat(bill.subtotal) || 0;
+                        let discAmt = parseFloat(bill.discount_amount) || 0;
+                        let taxAmt  = parseFloat(bill.tax_amount) || 0;
+                        let discP = sub > 0 ? Math.round((discAmt / sub) * 100) : 0;
+                        let afterD = sub - discAmt;
+                        let taxP = afterD > 0 ? Math.round((taxAmt / afterD) * 100) : 0;
+                        $('#discount').val(discP);
+                        $('#tax').val(taxP);
+
+                        renderCart();
+                        updateHeldCount();
+
+                        // Close held bills modal
+                        const modalEl = document.getElementById('heldBillsModal');
+                        const modalInst = bootstrap.Modal.getInstance(modalEl);
+                        if (modalInst) modalInst.hide();
+
+                        if (warnings.length > 0) {
+                            alert("Hold bill " + holdBillNo + " recalled.\n\nStock changes detected since hold:\n" + warnings.join("\n"));
+                        } else {
+                            alert("Hold bill " + holdBillNo + " recalled successfully!");
+                        }
+                    },
+                    error: function() {
+                        // Fallback: load cart with stored maxStock (graceful degradation)
+                        cart = rawCart.map(i => ({
+                            id:       Number(i.id),
+                            name:     i.name,
+                            price:    parseFloat(i.price)  || 0,
+                            qty:      parseInt(i.qty)      || 1,
+                            maxStock: parseInt(i.maxStock) || 999
+                        }));
+                        $('#resumedHoldBillNo').val(bill.hold_bill_no);
+                        $('#customerId').val(bill.customer_id || '');
+                        $('#saleNotes').val(bill.notes || '');
+                        renderCart();
+                        updateHeldCount();
+                        const modalEl = document.getElementById('heldBillsModal');
+                        const modalInst = bootstrap.Modal.getInstance(modalEl);
+                        if (modalInst) modalInst.hide();
+                        alert("Hold bill " + holdBillNo + " recalled (stock check unavailable).");
+                    }
+                });
+            } else {
+                alert("Failed to recall bill: " + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert("Error resuming held bill: " + error);
+        }
+    });
+}
+
+// Discard Held Bill
+function deleteHeldBill(holdBillNo) {
+    if (!confirm("Are you sure you want to permanently discard this held bill?\nThis action will cancel the bill in the database and audit trail.")) return;
+    
+    $.ajax({
+        type: 'GET',
+        url: 'api/pending_sales_api.php',
+        data: { action: 'cancel', hold_bill_no: holdBillNo },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                // Update counter
+                updateHeldCount();
+                
+                // Reload list
+                loadHeldBillsList();
+                
+                alert("Held bill discarded successfully.");
+            } else {
+                alert("Failed to cancel bill: " + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert("Error cancelling held bill: " + error);
+        }
+    });
+}
+
 $(document).ready(function() {
     loadProducts();
+    updateHeldCount();
     
     // Live product search
     $('#searchProduct').on('keyup', function() {
         loadProducts($(this).val());
     });
+
+    // Check for inline injected resumed bill data
+    if (resumedBillData) {
+        try {
+            let rawCart = JSON.parse(resumedBillData.cart_data_json);
+
+            // ── Validate recalled cart stock from DB before restoring ──
+            $.ajax({
+                type: 'POST',
+                url: 'api/stock_check.php',
+                data: { items: JSON.stringify(rawCart.map(i => ({ id: i.id, qty: i.qty }))) },
+                dataType: 'json',
+                success: function(stockResp) {
+                    let stockMap = {};
+                    if (stockResp.success && stockResp.items) {
+                        stockResp.items.forEach(s => { stockMap[s.id] = s; });
+                    }
+
+                    let warnings = [];
+                    cart = rawCart.map(i => {
+                        let itemId    = Number(i.id);
+                        let itemQty   = parseInt(i.qty)    || 1;
+                        let itemPrice = parseFloat(i.price) || 0;
+                        let liveStock = stockMap[itemId] ? stockMap[itemId].current_stock : parseInt(i.maxStock) || 999;
+                        let finalQty  = itemQty;
+
+                        if (stockMap[itemId] && !stockMap[itemId].sufficient) {
+                            finalQty = liveStock;
+                            if (finalQty === 0) {
+                                warnings.push(`⚠ "${escapeHtml(i.name)}" is now OUT OF STOCK — removed.`);
+                                return null;
+                            } else {
+                                warnings.push(`⚠ "${escapeHtml(i.name)}": qty reduced ${itemQty}→${finalQty} (stock: ${liveStock}).`);
+                            }
+                        }
+
+                        if (!stockMap[itemId] || !stockMap[itemId].product_exists) {
+                            warnings.push(`⚠ "${escapeHtml(i.name)}" no longer exists — removed.`);
+                            return null;
+                        }
+
+                        return {
+                            id:       itemId,
+                            name:     i.name,
+                            price:    itemPrice,
+                            qty:      finalQty,
+                            maxStock: liveStock
+                        };
+                    }).filter(i => i !== null && i.qty > 0);
+
+                    $('#resumedHoldBillNo').val(resumedBillData.hold_bill_no);
+                    $('#customerId').val(resumedBillData.customer_id || '');
+
+                    let sub    = parseFloat(resumedBillData.subtotal)       || 0;
+                    let discAmt= parseFloat(resumedBillData.discount_amount) || 0;
+                    let taxAmt = parseFloat(resumedBillData.tax_amount)      || 0;
+                    let discP  = sub > 0 ? Math.round((discAmt / sub) * 100) : 0;
+                    let afterD = sub - discAmt;
+                    let taxP   = afterD > 0 ? Math.round((taxAmt / afterD) * 100) : 0;
+                    $('#discount').val(discP);
+                    $('#tax').val(taxP);
+                    $('#saleNotes').val(resumedBillData.notes || '');
+
+                    renderCart();
+
+                    if (warnings.length > 0) {
+                        alert('Resumed Hold Bill ' + resumedBillData.hold_bill_no + '.\n\nStock changes since hold:\n' + warnings.join('\n'));
+                    } else {
+                        alert('Resumed Hold Bill ' + resumedBillData.hold_bill_no + ' successfully!');
+                    }
+                },
+                error: function() {
+                    // Fallback if stock_check.php unavailable
+                    cart = rawCart.map(i => ({
+                        id:       Number(i.id),
+                        name:     i.name,
+                        price:    parseFloat(i.price)  || 0,
+                        qty:      parseInt(i.qty)      || 1,
+                        maxStock: parseInt(i.maxStock) || 999
+                    }));
+                    $('#resumedHoldBillNo').val(resumedBillData.hold_bill_no);
+                    $('#customerId').val(resumedBillData.customer_id || '');
+                    let sub    = parseFloat(resumedBillData.subtotal)       || 0;
+                    let discAmt= parseFloat(resumedBillData.discount_amount) || 0;
+                    let taxAmt = parseFloat(resumedBillData.tax_amount)      || 0;
+                    let discP  = sub > 0 ? Math.round((discAmt / sub) * 100) : 0;
+                    let afterD = sub - discAmt;
+                    let taxP   = afterD > 0 ? Math.round((taxAmt / afterD) * 100) : 0;
+                    $('#discount').val(discP);
+                    $('#tax').val(taxP);
+                    $('#saleNotes').val(resumedBillData.notes || '');
+                    renderCart();
+                    alert('Resumed Hold Bill ' + resumedBillData.hold_bill_no + ' (stock check unavailable).');
+                }
+            });
+        } catch (e) {
+            console.error("Error resuming bill:", e);
+        }
+    }
 });
 </script>
 

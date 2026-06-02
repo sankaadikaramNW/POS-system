@@ -38,37 +38,61 @@ $suppliers = $pdo->query("SELECT * FROM suppliers ORDER BY id DESC")->fetchAll()
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Suppliers</h2>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#supplierModal" onclick="resetForm()">
-        <i class="fas fa-plus"></i> Add Supplier
+    <div>
+        <h2 class="fw-bold mb-1">Suppliers</h2>
+        <p class="text-muted mb-0 small">
+            Total: <strong><?= count($suppliers) ?></strong> supplier<?= count($suppliers) !== 1 ? 's' : '' ?>
+        </p>
+    </div>
+    <button class="btn btn-orange-premium" data-bs-toggle="modal" data-bs-target="#supplierModal" onclick="resetForm()">
+        <i class="fas fa-plus me-1"></i> Add Supplier
     </button>
 </div>
 
 <div class="card">
-    <div class="card-body">
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>Email</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($suppliers as $s): ?>
-                <tr>
-                    <td><?= htmlspecialchars($s['supplier_name']) ?></td>
-                    <td><?= htmlspecialchars($s['phone']) ?></td>
-                    <td><?= htmlspecialchars($s['email']) ?></td>
-                    <td>
-                        <button class="btn btn-sm btn-info text-white" onclick='editSupplier(<?= json_encode($s) ?>)'><i class="fas fa-edit"></i></button>
-                        <a href="?delete=<?= $s['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete supplier?')"><i class="fas fa-trash"></i></a>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle m-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>Address</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($suppliers)): ?>
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <i class="fas fa-truck d-block fs-1 mb-3 opacity-25"></i>
+                            <h5 class="fw-bold mb-1">No Suppliers Available</h5>
+                            <p class="text-muted mb-3 small">No supplier records found. Add your first supplier to manage purchases.</p>
+                            <button class="btn btn-orange-premium btn-sm" data-bs-toggle="modal" data-bs-target="#supplierModal" onclick="resetForm()">
+                                <i class="fas fa-plus me-1"></i> Add First Supplier
+                            </button>
+                        </td>
+                    </tr>
+                    <?php else: ?>
+                    <?php foreach($suppliers as $i => $s): ?>
+                    <tr>
+                        <td class="text-muted small"><?= $i + 1 ?></td>
+                        <td class="fw-semibold"><?= htmlspecialchars($s['supplier_name']) ?></td>
+                        <td><?= htmlspecialchars($s['phone'] ?: '---') ?></td>
+                        <td><?= htmlspecialchars($s['email'] ?: '---') ?></td>
+                        <td class="text-muted small"><?= htmlspecialchars($s['address'] ?: '---') ?></td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-dark-premium text-info border-0 me-1" onclick='editSupplier(<?= json_encode($s) ?>)'><i class="fas fa-edit"></i></button>
+                            <a href="?delete=<?= $s['id'] ?>" class="btn btn-sm btn-dark-premium text-danger border-0" onclick="return confirm('Delete supplier?')"><i class="fas fa-trash"></i></a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 

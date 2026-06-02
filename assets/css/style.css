@@ -840,5 +840,72 @@ body {
     }
 }
 
+/* ==========================================================================
+   HELD BILLS & WAITING FUNCTIONALITY CUSTOM AESTHETICS
+   ========================================================================== */
+
+/* Golden/Amber Hold Button Styling */
+.btn-hold-premium {
+    background-color: #f59e0b !important;
+    border-color: #f59e0b !important;
+    color: white !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease;
+    padding: 8px 14px;
+    border-radius: 8px;
+}
+
+.btn-hold-premium:hover {
+    background-color: #d97706 !important;
+    border-color: #d97706 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+/* Dynamic Pulse Animation for Held Bills Indicator Button */
+@keyframes goldPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+    }
+}
+
+.pulse-held-active {
+    animation: goldPulse 1.8s infinite;
+    border-color: #f59e0b !important;
+    color: #f59e0b !important;
+    background-color: rgba(245, 158, 11, 0.08) !important;
+}
+
+/* Held Bills List Table styling */
+.held-bills-table th {
+    background-color: #f8fafc !important;
+    color: #475569 !important;
+    font-weight: 700 !important;
+    font-size: 0.82rem !important;
+    text-transform: uppercase;
+}
+
+.held-bills-table td {
+    padding: 12px 8px !important;
+}
+
+.held-bills-empty-state {
+    transition: all 0.3s ease;
+}
+
+.held-bills-badge {
+    background-color: #f1f5f9 !important;
+    color: #334155 !important;
+    border: 1px solid #cbd5e1 !important;
+    font-size: 0.8rem !important;
+    font-weight: 600;
+}
+
 
 

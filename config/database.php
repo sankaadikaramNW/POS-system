@@ -1,4 +1,5 @@
 <?php
+ob_start();
 // config/database.php
 
 // Read environment variables with fallback to local development defaults
