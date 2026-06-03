@@ -15,6 +15,12 @@
 
 session_start();
 require_once 'config/database.php';
+require_once 'includes/lock_check.php';
+
+// Check if current active business date is closed/locked
+$session_stmt = $pdo->query("SELECT business_date FROM day_end_sessions ORDER BY business_date DESC LIMIT 1");
+$active_business_date = $session_stmt->fetchColumn() ?: date('Y-m-d');
+check_day_end_lock($active_business_date, $pdo);
 
 header('Content-Type: application/json');
 

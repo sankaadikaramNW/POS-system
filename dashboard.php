@@ -2,6 +2,12 @@
 require_once 'config/database.php';
 require_once 'includes/header.php';
 
+// Fetch current active business date and status
+$session_stmt = $pdo->query("SELECT business_date, status FROM day_end_sessions ORDER BY business_date DESC LIMIT 1");
+$current_session = $session_stmt->fetch();
+$active_business_date = $current_session ? $current_session['business_date'] : date('Y-m-d');
+$business_day_status = $current_session ? strtoupper($current_session['status']) : 'OPEN';
+
 // Get today's sales
 $stmt = $pdo->prepare("SELECT COALESCE(SUM(total_amount), 0) as today_sales FROM sales WHERE DATE(sale_date) = CURDATE() AND status != 'CANCELLED'");
 $stmt->execute();
@@ -56,10 +62,19 @@ $stmt = $pdo->query("
 $low_stock = $stmt->fetchAll();
 ?>
 
-<div class="row mb-4">
-    <div class="col-12">
-        <h2 class="fw-bold">Dashboard Overview</h2>
-        <p class="text-muted">Welcome back, <?= htmlspecialchars($_SESSION['full_name'] ?? 'User') ?></p>
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8 col-sm-12">
+        <h2 class="fw-bold m-0">Dashboard Overview</h2>
+        <p class="text-muted m-0">Welcome back, <?= htmlspecialchars($_SESSION['full_name'] ?? 'User') ?></p>
+    </div>
+    <div class="col-md-4 col-sm-12 text-md-end mt-3 mt-md-0">
+        <div class="d-inline-flex align-items-center bg-white border rounded-pill px-3 py-2 shadow-sm">
+            <span class="text-muted small fw-bold me-2">BUSINESS DATE</span>
+            <strong class="font-monospace text-dark me-3"><?= htmlspecialchars($active_business_date) ?></strong>
+            <span class="badge bg-<?= $business_day_status === 'OPEN' ? 'success' : 'danger' ?> fw-bold font-monospace text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                <?= $business_day_status ?>
+            </span>
+        </div>
     </div>
 </div>
 

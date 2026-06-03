@@ -3,9 +3,9 @@
 require_once 'config/database.php';
 require_once 'includes/header.php';
 
-// Authorization check: Admin only
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    echo '<div class="alert alert-danger py-4 text-center my-5"><i class="fas fa-exclamation-triangle fs-1 d-block mb-3"></i><h4 class="fw-bold">Access Denied</h4><p class="m-0">Only administrators and managers have permissions to perform the Day End Process.</p></div>';
+// Authorization check: Admin or Super Admin
+if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
+    echo '<div class="alert alert-danger py-4 text-center my-5"><i class="fas fa-exclamation-triangle fs-1 d-block mb-3"></i><h4 class="fw-bold">Access Denied</h4><p class="m-0">Only administrators and super administrators have permissions to perform the Day End Process.</p></div>';
     require_once 'includes/footer.php';
     exit();
 }
@@ -63,6 +63,11 @@ try {
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(8px); }
         to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(60px); }
+        to { opacity: 1; transform: translateX(0); }
     }
 
     @media print {
@@ -739,13 +744,13 @@ try {
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                alert("Cashier shift reconciled successfully.");
+                showToast('Cashier shift reconciled and closed successfully.', 'success');
                 loadCashierShifts();
             } else {
-                alert("Failed: " + data.message);
+                showToast('Failed: ' + (data.message || 'Unknown error'), 'danger');
             }
         })
-        .catch(err => alert("Reconciliation call failed."));
+        .catch(err => showToast('Shift reconciliation call failed.', 'danger'));
     }
 
     /**
@@ -769,7 +774,7 @@ try {
                         .then(() => {
                             // Summing by matching payment methods
                             // Let's get them from sales summary data
-                            fetch('api/day_end_api.php?action=reconcile_payments', { method: 'POST' })
+                            fetch('api/day_end_api.php?action=get_payment_reconciliation')
                                 .then(res => res.json())
                                 .then(reconData => {
                                     if (reconData.success) {
@@ -781,11 +786,16 @@ try {
                                         document.getElementById('posCardText').innerText = 'LKR ' + posCardAmount.toLocaleString('en-US', {minimumFractionDigits:2});
                                         document.getElementById('posMobileText').innerText = 'LKR ' + posMobileAmount.toLocaleString('en-US', {minimumFractionDigits:2});
 
-                                        // Set inputs initially to POS totals to avoid typing
+                                        // Set inputs initially to saved gateway totals or POS totals
                                         if (document.getElementById('gatewayCash').value === '') {
-                                            document.getElementById('gatewayCash').value = posCashAmount.toFixed(2);
-                                            document.getElementById('gatewayCard').value = posCardAmount.toFixed(2);
-                                            document.getElementById('gatewayMobile').value = posMobileAmount.toFixed(2);
+                                            const savedCash = parseFloat(reconData.reconciliation.Cash.gateway_total);
+                                            const savedCard = parseFloat(reconData.reconciliation.Card.gateway_total);
+                                            const savedMobile = parseFloat(reconData.reconciliation.Mobile.gateway_total);
+                                            
+                                            // If they are 0 but POS total is 0, or if they have non-zero value, use them
+                                            document.getElementById('gatewayCash').value = (savedCash || posCashAmount).toFixed(2);
+                                            document.getElementById('gatewayCard').value = (savedCard || posCardAmount).toFixed(2);
+                                            document.getElementById('gatewayMobile').value = (savedMobile || posMobileAmount).toFixed(2);
                                         }
 
                                         calculatePaymentVariance('Cash');
@@ -841,10 +851,13 @@ try {
         .then(data => {
             if (data.success) {
                 paymentsReconciled = true;
-                alert("Payment channels reconciled and saved successfully.");
-                navigateStepChange(1);
+                showToast('Payment channels reconciled and saved successfully!', 'success');
+                setTimeout(() => navigateStepChange(1), 1200);
+            } else {
+                showToast('Reconciliation failed: ' + (data.message || 'Unknown error'), 'danger');
             }
-        });
+        })
+        .catch(() => showToast('Communication error during reconciliation.', 'danger'));
     }
 
     /**
@@ -1038,7 +1051,7 @@ try {
                             document.getElementById('zReportCashierTable').innerHTML = cashierRows;
                         });
 
-                    fetch('api/day_end_api.php?action=reconcile_payments', { method: 'POST' })
+                    fetch('api/day_end_api.php?action=get_payment_reconciliation')
                         .then(r => r.json())
                         .then(reconData => {
                             let payRows = '';
@@ -1069,23 +1082,58 @@ try {
         fetch('api/day_end_api.php?action=run_backup')
             .then(res => res.json())
             .then(data => {
-                btn.disabled = false;
-                btn.innerHTML = `<i class="fas fa-save me-1"></i> Execute Database Backup`;
-                
                 if (data.success) {
                     backupCompleted = true;
-                    document.getElementById('backupResultCard').classList.remove('d-none');
+                    // Update button to show success state
+                    btn.disabled = false;
+                    btn.className = 'btn btn-success px-4 fw-bold';
+                    btn.innerHTML = `<i class="fas fa-check-circle me-1"></i> Backup Successful`;
+                    // Show inline success card
+                    const resultCard = document.getElementById('backupResultCard');
                     document.getElementById('backupFileNameText').innerText = data.backup_file;
-                    alert("Backup completed successfully.");
+                    resultCard.classList.remove('d-none');
+                    resultCard.style.animation = 'fadeIn 0.4s ease-in-out';
+                    // Show toast-style notification
+                    showToast('Database backup completed successfully!', 'success');
                 } else {
-                    alert("Backup failed: " + data.message);
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="fas fa-save me-1"></i> Execute Database Backup`;
+                    showToast('Backup failed: ' + data.message, 'danger');
                 }
             })
             .catch(() => {
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fas fa-save me-1"></i> Execute Database Backup`;
-                alert("Communication error during backup.");
+                showToast('Communication error during backup.', 'danger');
             });
+    }
+
+    function showToast(message, type = 'success') {
+        // Remove existing toast if any
+        const existing = document.getElementById('posToast');
+        if (existing) existing.remove();
+        
+        const toast = document.createElement('div');
+        toast.id = 'posToast';
+        toast.style.cssText = `
+            position: fixed; top: 80px; right: 24px; z-index: 9999;
+            padding: 14px 20px; border-radius: 12px; font-weight: 600;
+            font-size: 0.9rem; min-width: 280px; max-width: 400px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            display: flex; align-items: center; gap: 10px;
+            animation: slideInRight 0.35s ease-out;
+            background: ${type === 'success' ? '#dcfce7' : '#fee2e2'};
+            color: ${type === 'success' ? '#15803d' : '#dc2626'};
+            border: 1px solid ${type === 'success' ? '#bbf7d0' : '#fecaca'};
+        `;
+        toast.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}" style="font-size:1.1rem;"></i>
+            <span>${message}</span>
+            <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:inherit;font-size:1rem;">✕</button>
+        `;
+        document.body.appendChild(toast);
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => { if (toast.parentElement) toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 5000);
     }
 
     /**
@@ -1104,20 +1152,184 @@ try {
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    alert("CONGRATULATIONS!\nDay close finalized and locked successfully.\nNext active business period date opened: " + data.next_business_date);
-                    window.location.href = 'dashboard.php';
+                    // Show a premium success overlay before redirecting
+                    const overlay = document.createElement('div');
+                    overlay.style.cssText = `
+                        position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;
+                        display:flex;flex-direction:column;align-items:center;justify-content:center;
+                        color:white;text-align:center;animation:fadeIn 0.3s ease;
+                    `;
+                    overlay.innerHTML = `
+                        <div style="background:linear-gradient(135deg,#16a34a,#15803d);border-radius:20px;padding:48px 56px;max-width:440px;box-shadow:0 24px 60px rgba(0,0,0,0.4);">
+                            <i class="fas fa-lock" style="font-size:3.5rem;margin-bottom:16px;display:block;"></i>
+                            <h3 style="font-weight:800;margin-bottom:8px;">Day Successfully Locked!</h3>
+                            <p style="opacity:0.85;margin-bottom:20px;">Business date <strong>${businessDate}</strong> is now permanently locked and secured.</p>
+                            <div style="background:rgba(255,255,255,0.15);border-radius:10px;padding:12px 20px;font-family:monospace;font-size:1rem;margin-bottom:24px;">
+                                <i class="fas fa-calendar-alt me-2"></i> Next Business Date: <strong>${data.next_business_date}</strong>
+                            </div>
+                            <p style="font-size:0.85rem;opacity:0.7;">Redirecting to Dashboard...</p>
+                        </div>
+                    `;
+                    document.body.appendChild(overlay);
+                    setTimeout(() => { window.location.href = 'dashboard.php'; }, 2800);
                 } else {
                     btn.disabled = false;
                     btn.innerHTML = `<i class="fas fa-calendar-times me-2"></i> Permanently Lock & Close Day`;
-                    alert("Finalize failed: " + data.message);
+                    showToast('Finalize failed: ' + data.message, 'danger');
                 }
             })
             .catch(() => {
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fas fa-calendar-times me-2"></i> Permanently Lock & Close Day`;
-                alert("Communication error during finalization.");
+                showToast('Communication error during finalization. Please try again.', 'danger');
             });
     }
 </script>
+
+<?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'super_admin'): ?>
+    <?php
+    // Fetch recent closed day end sessions
+    $closed_sessions = $pdo->query("
+        SELECT des.*, u.full_name as closed_by_name, ur.full_name as reopened_by_name
+        FROM day_end_sessions des
+        LEFT JOIN users u ON des.closed_by = u.id
+        LEFT JOIN users ur ON des.reopened_by = ur.id
+        WHERE des.status = 'closed'
+        ORDER BY des.business_date DESC
+        LIMIT 10
+    ")->fetchAll();
+    ?>
+    <div class="card shadow-sm border-0 my-5" style="border-radius: 16px;">
+        <div class="card-header bg-dark text-white py-3" style="border-top-left-radius: 16px; border-top-right-radius: 16px;">
+            <h5 class="fw-bold mb-0"><i class="fas fa-history me-2 text-warning"></i> Closed Business Days History (Super Admin Override)</h5>
+        </div>
+        <div class="card-body p-4">
+            <p class="text-muted small">The following days are closed and locked. As a Super Admin, you can select any day to reopen. Reopening a day will close the currently open day and require a mandatory reason.</p>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Business Date</th>
+                            <th>Closed By</th>
+                            <th>Closed At</th>
+                            <th class="text-end">Gross Sales</th>
+                            <th class="text-end">Net Revenue</th>
+                            <th>Reopen Status</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($closed_sessions)): ?>
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">No closed business days found.</td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($closed_sessions as $cs): ?>
+                                <tr>
+                                    <td class="fw-bold font-monospace"><?= htmlspecialchars($cs['business_date']) ?></td>
+                                    <td><?= htmlspecialchars($cs['closed_by_name'] ?? 'System') ?></td>
+                                    <td><small><?= htmlspecialchars($cs['closed_at'] ?? '—') ?></small></td>
+                                    <td class="text-end font-monospace">LKR <?= number_format($cs['total_sales'], 2) ?></td>
+                                    <td class="text-end font-monospace">LKR <?= number_format($cs['net_sales'], 2) ?></td>
+                                    <td>
+                                        <?php if ($cs['reopened_by']): ?>
+                                            <span class="badge bg-warning text-dark" title="Reason: <?= htmlspecialchars($cs['reopen_reason']) ?>">
+                                                Reopened
+                                            </span>
+                                            <div class="small text-muted" style="font-size:0.7rem;">By <?= htmlspecialchars($cs['reopened_by_name']) ?></div>
+                                        <?php else: ?>
+                                            <span class="badge bg-secondary">Locked</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-warning fw-bold px-3 py-1" onclick="openReopenModal('<?= $cs['business_date'] ?>')">
+                                            <i class="fas fa-lock-open me-1"></i> Reopen
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reopen Modal -->
+    <div class="modal fade" id="reopenModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form id="reopenForm" class="modal-content glass-receipt-modal" onsubmit="submitReopen(event)">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-lock-open text-warning me-2"></i> Reopen Business Day</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="business_date" id="reopenDateInput">
+                    <div class="mb-3">
+                        <label class="fw-semibold mb-1">Target Business Date</label>
+                        <input type="text" id="reopenDateDisplay" class="form-control" readonly style="font-family: monospace; font-weight: bold; background: #e2e8f0;">
+                    </div>
+                    <div class="mb-3">
+                        <label class="fw-semibold mb-1">Reason for Reopening <span class="text-danger">*</span></label>
+                        <textarea name="reason" id="reopenReasonInput" class="form-control" rows="3" required placeholder="Enter detailed reason for audits..."></textarea>
+                    </div>
+                    <div class="alert alert-danger py-2 small mb-0">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <strong>CRITICAL WARNING:</strong> Reopening this day will immediately lock the currently active day and restore write privileges to the reopened date.
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-dark-premium" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning fw-bold"><i class="fas fa-check me-1"></i> Confirm & Reopen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openReopenModal(date) {
+            document.getElementById('reopenDateInput').value = date;
+            document.getElementById('reopenDateDisplay').value = date;
+            document.getElementById('reopenReasonInput').value = '';
+            var myModal = new bootstrap.Modal(document.getElementById('reopenModal'));
+            myModal.show();
+        }
+
+        function submitReopen(e) {
+            e.preventDefault();
+            const date = document.getElementById('reopenDateInput').value;
+            const reason = document.getElementById('reopenReasonInput').value;
+            
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Reopening...`;
+
+            const formData = new FormData();
+            formData.append('business_date', date);
+            formData.append('reason', reason);
+
+            fetch('api/day_end_api.php?action=reopen_day', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-check me-1"></i> Confirm & Reopen`;
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert("Failed to reopen day: " + data.message);
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-check me-1"></i> Confirm & Reopen`;
+                alert("Communication error: " + err);
+            });
+        }
+    </script>
+<?php endif; ?>
 
 <?php require_once 'includes/footer.php'; ?>

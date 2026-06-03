@@ -7,7 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // 1. Authentication and Authorization Check
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Unauthorized: Only administrators are permitted to perform the Day End process.']);
     exit();
@@ -80,6 +80,15 @@ try {
             ]);
             break;
 
+        case 'get_payment_reconciliation':
+            $recon = $service->getPaymentReconciliation($business_date);
+            echo json_encode([
+                'success' => true,
+                'business_date' => $business_date,
+                'reconciliation' => $recon
+            ]);
+            break;
+
         case 'get_sales_summary':
             $data = $service->getSalesSummary($business_date);
             echo json_encode([
@@ -135,11 +144,36 @@ try {
             ]);
             break;
 
+        case 'reopen_day':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                throw new Exception('Invalid request method');
+            }
+            if ($_SESSION['role'] !== 'super_admin') {
+                throw new Exception('Unauthorized: Only Super Administrators can reopen a closed business day.');
+            }
+            $target_date = $_POST['business_date'] ?? '';
+            $reason = trim($_POST['reason'] ?? '');
+            
+            if (empty($target_date)) {
+                throw new Exception('Business date is required.');
+            }
+            if (empty($reason)) {
+                throw new Exception('Reopen reason is required.');
+            }
+
+            $service->reopenBusinessDay($target_date, $reason, $user_id);
+            echo json_encode([
+                'success' => true,
+                'message' => "Business date $target_date has been reopened successfully."
+            ]);
+            break;
+
         default:
             throw new Exception("Unknown action: " . htmlspecialchars($action));
     }
 
 } catch (Exception $e) {
+    file_put_contents(__DIR__ . '/error.log', date('[Y-m-d H:i:s] ') . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n\n", FILE_APPEND);
     http_response_code(500);
     echo json_encode([
         'success' => false,

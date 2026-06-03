@@ -4,6 +4,11 @@ require_once 'includes/header.php';
 
 // Handle Add/Edit Customer
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_customer'])) {
+    require_once 'includes/lock_check.php';
+    $session_stmt = $pdo->query("SELECT business_date FROM day_end_sessions ORDER BY business_date DESC LIMIT 1");
+    $active_business_date = $session_stmt->fetchColumn() ?: date('Y-m-d');
+    check_day_end_lock($active_business_date, $pdo);
+
     $customer_name = $_POST['customer_name'];
     $phone = $_POST['phone'];
     $email = $_POST['email'];
@@ -22,6 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_customer'])) {
 }
 
 if (isset($_GET['delete'])) {
+    require_once 'includes/lock_check.php';
+    $session_stmt = $pdo->query("SELECT business_date FROM day_end_sessions ORDER BY business_date DESC LIMIT 1");
+    $active_business_date = $session_stmt->fetchColumn() ?: date('Y-m-d');
+    check_day_end_lock($active_business_date, $pdo);
+
     $stmt = $pdo->prepare("DELETE FROM customers WHERE id = ?");
     $stmt->execute([$_GET['delete']]);
     header("Location: customers.php");

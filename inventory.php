@@ -13,6 +13,12 @@ require_once 'includes/header.php';
 
 // ── Handle Stock Adjustment ──────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['adjust_stock'])) {
+    require_once 'includes/lock_check.php';
+    // Get the current active business date
+    $session_stmt = $pdo->query("SELECT business_date FROM day_end_sessions ORDER BY business_date DESC LIMIT 1");
+    $active_business_date = $session_stmt->fetchColumn() ?: date('Y-m-d');
+    check_day_end_lock($active_business_date, $pdo);
+
     $product_id  = (int)$_POST['product_id'];
     $action_type = $_POST['action_type']; // STOCK_IN, STOCK_OUT, DAMAGES
     $quantity    = (int)$_POST['quantity'];

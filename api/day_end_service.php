@@ -176,6 +176,47 @@ class DayEndService {
     }
 
     /**
+     * Get payment reconciliation data without modifying database
+     */
+    public function getPaymentReconciliation($business_date) {
+        $methods = ['Cash', 'Card', 'Mobile'];
+        $results = [];
+
+        foreach ($methods as $method) {
+            $stmt = $this->pdo->prepare("
+                SELECT pos_total, gateway_total, variance 
+                FROM payment_reconciliation 
+                WHERE business_date = ? AND payment_method = ?
+            ");
+            $stmt->execute([$business_date, $method]);
+            $recon = $stmt->fetch();
+
+            if ($recon) {
+                $results[$method] = [
+                    'pos_total' => floatval($recon['pos_total']),
+                    'gateway_total' => floatval($recon['gateway_total']),
+                    'variance' => floatval($recon['variance'])
+                ];
+            } else {
+                $pos_stmt = $this->pdo->prepare("
+                    SELECT COALESCE(SUM(total_amount), 0) 
+                    FROM sales 
+                    WHERE DATE(sale_date) = ? AND payment_method = ? AND status != 'CANCELLED'
+                ");
+                $pos_stmt->execute([$business_date, $method]);
+                $pos_total = floatval($pos_stmt->fetchColumn());
+
+                $results[$method] = [
+                    'pos_total' => $pos_total,
+                    'gateway_total' => 0.00,
+                    'variance' => -$pos_total
+                ];
+            }
+        }
+        return $results;
+    }
+
+    /**
      * Generate Sales Summary Reports
      */
     public function getSalesSummary($business_date) {
@@ -441,29 +482,108 @@ class DayEndService {
         $this->pdo->beginTransaction();
         try {
             // Get sales metrics for summary save
-            $metrics_stmt = $this->pdo->prepare("
+            $sales_stmt = $this->pdo->prepare("
                 SELECT 
+                    COUNT(id) as sales_count,
                     COALESCE(SUM(total_amount), 0) as net,
                     COALESCE(SUM(discount), 0) as discounts,
-                    COALESCE(SUM(tax), 0) as tax
+                    COALESCE(SUM(tax), 0) as tax,
+                    COALESCE(SUM(total_amount + discount), 0) as gross
                 FROM sales
-                WHERE DATE(sale_date) = ?
+                WHERE DATE(sale_date) = ? AND status != 'CANCELLED'
             ");
-            $metrics_stmt->execute([$business_date]);
-            $metrics = $metrics_stmt->fetch();
+            $sales_stmt->execute([$business_date]);
+            $sales_metrics = $sales_stmt->fetch();
+
+            // Total Purchases
+            $purch_stmt = $this->pdo->prepare("
+                SELECT COALESCE(SUM(total_amount), 0)
+                FROM purchases
+                WHERE purchase_date = ?
+            ");
+            $purch_stmt->execute([$business_date]);
+            $total_purchases = floatval($purch_stmt->fetchColumn());
+
+            // Total Cash Payments
+            $cash_stmt = $this->pdo->prepare("
+                SELECT COALESCE(SUM(total_amount), 0)
+                FROM sales
+                WHERE DATE(sale_date) = ? AND payment_method = 'Cash' AND status != 'CANCELLED'
+            ");
+            $cash_stmt->execute([$business_date]);
+            $total_cash_payments = floatval($cash_stmt->fetchColumn());
+
+            // Total Card Payments
+            $card_stmt = $this->pdo->prepare("
+                SELECT COALESCE(SUM(total_amount), 0)
+                FROM sales
+                WHERE DATE(sale_date) = ? AND payment_method = 'Card' AND status != 'CANCELLED'
+            ");
+            $card_stmt->execute([$business_date]);
+            $total_card_payments = floatval($card_stmt->fetchColumn());
+
+            // Total Pending Bills count
+            $pending_stmt = $this->pdo->prepare("
+                SELECT COUNT(id)
+                FROM pending_sales
+                WHERE status = 'PENDING' AND DATE(created_at) = ?
+            ");
+            $pending_stmt->execute([$business_date]);
+            $total_pending_bills = intval($pending_stmt->fetchColumn());
+
+            // Stock Adjustments count/sum
+            $adjust_stmt = $this->pdo->prepare("
+                SELECT COALESCE(SUM(ABS(quantity)), 0)
+                FROM stock_movements
+                WHERE movement_type = 'ADJUSTMENT' AND DATE(created_at) = ?
+            ");
+            $adjust_stmt->execute([$business_date]);
+            $stock_adjustments = intval($adjust_stmt->fetchColumn());
+
+            // Closing Balance (Sum of cashier closing drawer cash, or payments reconciled)
+            $closing_stmt = $this->pdo->prepare("
+                SELECT COALESCE(SUM(closing_cash), 0)
+                FROM cashier_shifts
+                WHERE business_date = ?
+            ");
+            $closing_stmt->execute([$business_date]);
+            $closing_balance = floatval($closing_stmt->fetchColumn());
+            if ($closing_balance == 0) {
+                // fallback to calculated cash + card if no cashier shifts are closed
+                $closing_balance = $total_cash_payments + $total_card_payments;
+            }
 
             // 1. Close current day end session
             $close_stmt = $this->pdo->prepare("
                 UPDATE day_end_sessions 
-                SET status = 'closed', closed_at = NOW(), closed_by = ?, total_sales = ?, total_tax = ?, total_discount = ?, net_sales = ?
+                SET status = 'closed', 
+                    closed_at = NOW(), 
+                    closed_by = ?, 
+                    total_sales = ?, 
+                    total_tax = ?, 
+                    total_discount = ?, 
+                    net_sales = ?,
+                    total_expenses = 0.00,
+                    total_purchases = ?,
+                    total_cash_payments = ?,
+                    total_card_payments = ?,
+                    total_pending_bills = ?,
+                    stock_adjustments = ?,
+                    closing_balance = ?
                 WHERE business_date = ? AND status = 'open'
             ");
             $close_stmt->execute([
                 $user_id,
-                $metrics['net'],
-                $metrics['tax'],
-                $metrics['discounts'],
-                $metrics['net'],
+                $sales_metrics['gross'], // Total sales (gross)
+                $sales_metrics['tax'],   // Total tax
+                $sales_metrics['discounts'], // Total discounts
+                $sales_metrics['net'],   // Net sales (Total Revenue)
+                $total_purchases,
+                $total_cash_payments,
+                $total_card_payments,
+                $total_pending_bills,
+                $stock_adjustments,
+                $closing_balance,
                 $business_date
             ]);
 
@@ -486,6 +606,47 @@ class DayEndService {
             
             $this->pdo->commit();
             return $next_date;
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Reopen a closed business day (Super Admin only)
+     */
+    public function reopenBusinessDay($business_date, $reason, $user_id) {
+        $this->pdo->beginTransaction();
+        try {
+            // Check if the business day exists and is closed
+            $check_stmt = $this->pdo->prepare("SELECT status FROM day_end_sessions WHERE business_date = ?");
+            $check_stmt->execute([$business_date]);
+            $status = $check_stmt->fetchColumn();
+            
+            if ($status !== 'closed') {
+                throw new Exception("This business date ($business_date) is not closed.");
+            }
+            
+            // Close any currently open session first (since only one session can be active at a time)
+            $close_all = $this->pdo->prepare("UPDATE day_end_sessions SET status = 'closed', closed_at = NOW() WHERE status = 'open'");
+            $close_all->execute();
+            
+            // Reopen the target session
+            $reopen_stmt = $this->pdo->prepare("
+                UPDATE day_end_sessions 
+                SET status = 'open',
+                    reopened_by = ?,
+                    reopened_at = NOW(),
+                    reopen_reason = ?
+                WHERE business_date = ?
+            ");
+            $reopen_stmt->execute([$user_id, $reason, $business_date]);
+            
+            // Create audit log
+            $this->logAudit($user_id, 'DAY_REOPENED', "Reopened business date: $business_date. Reason: $reason");
+            
+            $this->pdo->commit();
+            return true;
         } catch (Exception $e) {
             $this->pdo->rollBack();
             throw $e;

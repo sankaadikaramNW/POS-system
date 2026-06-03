@@ -82,6 +82,10 @@ try {
         throw new Exception("Sale with invoice number '{$invoice_no}' not found.");
     }
 
+    // Check if the sale's business day is closed/locked
+    require_once __DIR__ . '/../includes/lock_check.php';
+    check_day_end_lock($sale['sale_date'], $pdo);
+
     // ── 2. Idempotency — already cancelled is a success (no-op) ──────────
     if ($sale['status'] === 'CANCELLED') {
         $pdo->rollBack();

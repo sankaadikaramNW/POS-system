@@ -2,7 +2,7 @@
 require_once 'config/database.php';
 require_once 'includes/header.php';
 
-if ($_SESSION['role'] !== 'admin') {
+if (!in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     echo "<div class='alert alert-danger'>Access Denied.</div>";
     require_once 'includes/footer.php';
     exit();
@@ -10,6 +10,11 @@ if ($_SESSION['role'] !== 'admin') {
 
 // Handle Add/Edit Supplier
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_supplier'])) {
+    require_once 'includes/lock_check.php';
+    $session_stmt = $pdo->query("SELECT business_date FROM day_end_sessions ORDER BY business_date DESC LIMIT 1");
+    $active_business_date = $session_stmt->fetchColumn() ?: date('Y-m-d');
+    check_day_end_lock($active_business_date, $pdo);
+
     $supplier_name = $_POST['supplier_name'];
     $phone = $_POST['phone'];
     $email = $_POST['email'];
@@ -28,6 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_supplier'])) {
 }
 
 if (isset($_GET['delete'])) {
+    require_once 'includes/lock_check.php';
+    $session_stmt = $pdo->query("SELECT business_date FROM day_end_sessions ORDER BY business_date DESC LIMIT 1");
+    $active_business_date = $session_stmt->fetchColumn() ?: date('Y-m-d');
+    check_day_end_lock($active_business_date, $pdo);
+
     $stmt = $pdo->prepare("DELETE FROM suppliers WHERE id = ?");
     $stmt->execute([$_GET['delete']]);
     header("Location: suppliers.php");
