@@ -27,7 +27,8 @@ body {
     color: #fff;
     transition: all 0.3s;
     height: 100vh;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 #sidebar.active {
@@ -52,6 +53,8 @@ body {
 
 #sidebar ul.components {
     padding: 20px 0;
+    flex: 1;
+    overflow-y: auto;
 }
 
 #sidebar ul p {

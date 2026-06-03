@@ -72,7 +72,7 @@ $role = $_SESSION['role'] ?? 'cashier';
     </ul>
 
     <!-- Sidebar Version Footer -->
-    <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 20px;border-top:1px solid rgba(255,255,255,0.07);background:#0c0d12;">
+    <div style="padding:12px 20px;border-top:1px solid rgba(255,255,255,0.07);background:#0c0d12;margin-top:auto;">
         <?php if ($role === 'admin'): ?>
         <a href="system_info.php" style="display:flex;align-items:center;gap:8px;text-decoration:none;margin-bottom:8px;padding:6px 8px;border-radius:8px;transition:background .2s;" onmouseover="this.style.background='rgba(15,98,254,.12)'" onmouseout="this.style.background='transparent'">
             <i class="fas fa-info-circle" style="color:#0f62fe;font-size:.85rem;"></i>
